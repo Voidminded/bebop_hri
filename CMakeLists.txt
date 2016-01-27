@@ -13,9 +13,13 @@ find_package(catkin REQUIRED COMPONENTS
   angles
   geometry_msgs
   tf2
+  message_generation
+  visp_bridge
+  control_toolbox
 )
 
 find_package(OpenCV REQUIRED)
+find_package(VISP REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -51,11 +55,10 @@ find_package(OpenCV REQUIRED)
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  debug.msg
+)
 
 ## Generate services in the 'srv' folder
 # add_service_files(
@@ -71,11 +74,11 @@ find_package(OpenCV REQUIRED)
 #   Action2.action
 # )
 
-## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   bebop_msgs#   std_msgs
-# )
+# Generate added messages and services with any dependencies listed here
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -123,6 +126,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
+  ${VISP_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -138,11 +142,12 @@ include_directories(
 ## Declare a C++ executable
 add_executable(depth_eval_node src/depth_eval_node.cpp)
 
-# add_dependencies(bebop_hri_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(depth_eval_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(depth_eval_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${VISP_LIBRARIES}
 )
 
 #############

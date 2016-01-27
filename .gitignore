@@ -39,3 +39,4 @@ bebop_driver/scripts/meta/*.rst
 
 # Temporary files
 *~
+*.backup

@@ -10,6 +10,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>bebop_msgs</build_depend>
   <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
   <build_depend>std_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>image_transport</build_depend>
@@ -19,9 +20,14 @@
   <build_depend>angles</build_depend>
   <build_depend>geometry_msgs</build_depend>
   <build_depend>tf2</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>vision_visp</build_depend>
+  <build_depend>visp</build_depend>
+  <build_depend>control_toolbox</build_depend>
 
   <run_depend>bebop_msgs</run_depend>
   <run_depend>roscpp</run_depend>
+  <run_depend>rospy</run_depend>
   <run_depend>std_msgs</run_depend>
   <run_depend>ar_track_alvar</run_depend>
   <run_depend>image_transport</run_depend>
@@ -32,6 +38,11 @@
   <run_depend>angles</run_depend>
   <run_depend>geometry_msgs</run_depend>
   <run_depend>tf2</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>vision_visp</run_depend>
+  <run_depend>visp</run_depend>
+  <run_depend>control_toolbox</run_depend>
+  <run_depend>twist_mux</run_depend>
 
   <export>
   </export>
