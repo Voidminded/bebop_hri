@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="param_file" default="$(find bebop_hri)/config/behavior.yaml" />
+  <node name="behavior_node" type="behavior_node" pkg="bebop_hri" output="screen">
+    <remap from="status" to="behavior/status" />
+    <rosparam command="load" file="$(arg param_file)" />
+  </node>
+</launch>

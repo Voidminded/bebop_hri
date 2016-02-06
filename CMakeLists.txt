@@ -124,6 +124,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
   ${VISP_INCLUDE_DIRS}
@@ -148,6 +149,20 @@ target_link_libraries(depth_eval_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${VISP_LIBRARIES}
+)
+
+add_library(bebop_hri_utils src/util.cpp)
+target_link_libraries(bebop_hri_utils
+  ${catkin_LIBRARIES}
+)
+
+add_executable(behavior_node src/behavior.cpp)
+
+add_dependencies(behavior_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+target_link_libraries(behavior_node
+  bebop_hri_utils
+  ${catkin_LIBRARIES}
 )
 
 #############

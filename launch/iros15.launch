@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="joy_dev" default="/dev/input/js1" />
+
+  <node name="joy" type="joy_node" pkg="joy" output="screen">
+    <param name="dev" value="$(arg joy_dev)" />
+  </node>
+
+  <include file="$(find bebop_hri)/launch/behavior.launch">
+    <arg name="param_file" value="$(find bebop_hri)/config/behavior.yaml" />
+  </include>
+
+</launch>

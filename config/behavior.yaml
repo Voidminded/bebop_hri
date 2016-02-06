@@ -1,0 +1,6 @@
+update_freq: 15.0
+initial_mode: 0
+joy_override_buttion: 7
+joy_override_timeout: 15.0
+idle_timeout: 10
+
