@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="joy_dev" default="/dev/input/js1" />
+  <arg name="nodelets_output" default="log" />
 
   <node name="joy" type="joy_node" pkg="joy" output="screen">
     <param name="dev" value="$(arg joy_dev)" />
@@ -8,6 +9,19 @@
 
   <include file="$(find bebop_hri)/launch/behavior.launch">
     <arg name="param_file" value="$(find bebop_hri)/config/behavior.yaml" />
+  </include>
+
+  <!-- nodelets -->
+  <node pkg="nodelet" type="nodelet" args="manager" name="bebop_nodelet_manager" output="$(arg nodelets_output)">
+    <param name="num_worker_threads" value="4" />
+  </node>
+
+  <include file="$(find cftld_ros)/launch/cftld_nodelet.launch">
+    <arg name="output" value="$(arg nodelets_output)" />
+    <arg name="spawn_nodelet_manager" value="false" />
+    <arg name="nodelet_manager" value="bebop_nodelet_manager" />
+    <arg name="cftld_param_file" value="$(find cftld_ros)/config/default.yaml" />
+    <arg name="cftld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
   </include>
 
 </launch>

@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
   visp_bridge
   control_toolbox
+  cftld_ros
 )
 
 find_package(OpenCV REQUIRED)

@@ -1,4 +1,5 @@
 #include <ros/ros.h>
+#include <std_msgs/Empty.h>
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
@@ -10,8 +11,12 @@ namespace bebop_hri
 BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_nh)
   : nh_(nh),
     priv_nh_(priv_nh),
-    joy_sub_(nh, "joy", 10),
-    status_publisher_(nh, "status"),
+    sub_joy_(nh_, "joy", 10),
+    sub_periodic_tracks_(nh_, "periodic_tracks", 1),
+    sub_visual_tracker_track_(nh_, "visual_tracker_track", 1),
+    pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("reset_visual_tracker", 1, true)),
+    pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("init_visual_tracker", 1, true)),
+    status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_IDLE),
     bebop_prev_mode_(constants::MODE_IDLE),
     bebop_resume_mode_(constants::MODE_IDLE),
@@ -33,6 +38,7 @@ void BebopBehaviorNode::UpdateParams()
 void BebopBehaviorNode::Reset()
 {
   ROS_WARN("[BEH] Behavior Reset");
+  pub_cftld_tracker_reset_.publish(msg_empty_);
 }
 
 void BebopBehaviorNode::UpdateBehavior()
@@ -54,12 +60,14 @@ void BebopBehaviorNode::UpdateBehavior()
   bebop_prev_mode_ = bebop_mode_;
 
   // Deactivate all async subs if they are not fresh enough
-  joy_sub_.DeactivateIfOlderThan(1.0);
+  sub_joy_.DeactivateIfOlderThan(1.0);
+  sub_periodic_tracks_.DeactivateIfOlderThan(1.0);
+  sub_visual_tracker_track_.DeactivateIfOlderThan(1.0);
 
   // Emergency behavior is implemented way down the pipeline, in cmd_vel_mux layer
   // regardless of the current mode, is joy_override_button is pressed, we will pause execution
   if ((bebop_mode_ != constants::MODE_MANUAL) &&
-      joy_sub_.IsActive() && joy_sub_()->buttons.at(param_joy_override_button_))
+      sub_joy_.IsActive() && sub_joy_()->buttons.at(param_joy_override_button_))
   {
     ROS_WARN("[BEH] Joystick override detected");
     bebop_resume_mode_ = bebop_mode_;
@@ -100,13 +108,75 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_WARN_STREAM("[BEH] Behavior will be reset after override is over");
       bebop_resume_mode_ = constants::MODE_IDLE;
     }
-    if (joy_sub_.IsActive() && !joy_sub_()->buttons[param_joy_override_button_])
+    if (sub_joy_.IsActive() && !sub_joy_()->buttons[param_joy_override_button_])
     {
       ROS_WARN_STREAM("[BEH] Joystick override ended, going back to " << BEBOP_MODE_STR(bebop_resume_mode_));
       bebop_mode_ = bebop_resume_mode_;
     }
     break;
   }
+  case constants::MODE_SEARCHING:
+  {
+    if (is_transition)
+    {
+      ; // TODO: Enable obzerver
+    }
+    if (sub_periodic_tracks_.IsActive())
+    {
+      const sensor_msgs::RegionOfInterest& roi = sub_periodic_tracks_.GetMsgCopy();
+      ROS_INFO_STREAM("[BEH] Obzerver found a stationary periodic track [x, y, w, h]: "
+                      << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
+      pub_cftld_tracker_init_.publish(roi);      
+    }
+
+    // TODO: Add confidence
+    // TODO: Reset obzerver
+    if (sub_visual_tracker_track_.IsActive() &&
+        sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING)
+    {
+      const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
+      ROS_INFO_STREAM("[BEH] Visual tracker has been initialized. Approaching her ... id: "
+                      <<  t.uid << " confidence: " << t.confidence);
+      bebop_mode_ = constants::MODE_APPROACHING_PERSON;
+    }
+    break;
+  }
+
+  case constants::MODE_APPROACHING_PERSON:
+  {
+    if (is_transition)
+    {
+      ; // TODO: Enable Visual Servo
+    }
+
+    if (!sub_visual_tracker_track_.IsActive())
+    {
+      ROS_ERROR_STREAM("[BEH] Visual tracker is stale, this should never happen.");
+
+      // TODO: Disable visual servo
+      bebop_mode_ = constants::MODE_APPROACHING_LOST;
+      break;
+    }
+
+    const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
+
+    // TODO: Add confidence
+    if (t.status != cftld_ros::Track::STATUS_TRACKING)
+    {
+      ROS_WARN("[BEH] Tracker has lost the person");
+      // TODO: Disable visual servo
+      bebop_mode_ = constants::MODE_APPROACHING_LOST;
+    }
+
+    break;
+  }
+
+  case constants::MODE_APPROACHING_LOST:
+  {
+    bebop_mode_ = constants::MODE_IDLE;
+    break;
+  }
+
   case constants::MODE_NUM:
   {
     ROS_FATAL("WTF!");

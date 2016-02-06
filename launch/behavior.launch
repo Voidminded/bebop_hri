@@ -3,6 +3,10 @@
   <arg name="param_file" default="$(find bebop_hri)/config/behavior.yaml" />
   <node name="behavior_node" type="behavior_node" pkg="bebop_hri" output="screen">
     <remap from="status" to="behavior/status" />
+    <remap from="periodic_tracks" to="rqt_image_view/clicked_roi" />
+    <remap from="visual_tracker_track" to="cftld/track" />
+    <remap from="reset_visual_tracker" to="cftld/reset" />
+    <remap from="init_visual_tracker" to="cftld/init_roi" />
     <rosparam command="load" file="$(arg param_file)" />
   </node>
 </launch>
