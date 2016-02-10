@@ -1,0 +1,29 @@
+bebop:
+  bebop_nodelet:
+    GPSSettingsHomeTypeType: 0
+    GPSSettingsReturnHomeDelayDelay: 0
+    NetworkSettingsWifiSelectionBand: 0
+    NetworkSettingsWifiSelectionChannel: 1
+    NetworkSettingsWifiSelectionType: 1
+    PilotingSettingsAbsolutControlOn: 0
+    PilotingSettingsMaxAltitudeCurrent: 30.0
+    PilotingSettingsMaxDistanceValue: 0.0
+    PilotingSettingsMaxTiltCurrent: 20.0
+    PilotingSettingsNoFlyOverMaxDistanceShouldnotflyover: 0
+    SpeedSettingsHullProtectionPresent: 0
+    SpeedSettingsMaxRotationSpeedCurrent: 100.0
+    SpeedSettingsMaxVerticalSpeedCurrent: 1.0
+    SpeedSettingsOutdoorOutdoor: 1
+    bebop_ip: 192.168.42.1
+    camera_info_url: package://bebop_driver/data/bebop_camera_calib.yaml
+    reset_settings: true
+    states: {enable_altitudechanged: true, enable_autotakeoffmodechanged: true, enable_camerastate_orientation: true,
+      enable_commonstate_batterystatechanged: true, enable_commonstate_wifisignalchanged: true,
+      enable_controllerstate_ispilotingchanged: true, enable_flightplanstate_availabilitystatechanged: true,
+      enable_flightplanstate_componentstatelistchanged: true, enable_gpsstate_numberofsatellitechanged: true,
+      enable_mavlinkstate_mavlinkfileplayingstatechanged: true, enable_mavlinkstate_mavlinkplayerrorstatechanged: true,
+      enable_mediastreamingstate_videoenablechanged: true, enable_numberofsatellitechanged: true,
+      enable_overheatstate_overheatchanged: true, enable_pilotingstate_altitudechanged: true,
+      enable_pilotingstate_attitudechanged: true, enable_pilotingstate_flattrimchanged: true,
+      enable_pilotingstate_flyingstatechanged: true, enable_pilotingstate_navigatehomestatechanged: true,
+      enable_pilotingstate_positionchanged: true, enable_pilotingstate_speedchanged: true}
