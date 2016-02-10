@@ -5,8 +5,10 @@
     <remap from="status" to="behavior/status" />
     <remap from="periodic_tracks" to="rqt_image_view/clicked_roi" />
     <remap from="visual_tracker_track" to="cftld/track" />
-    <remap from="reset_visual_tracker" to="cftld/reset" />
-    <remap from="init_visual_tracker" to="cftld/init_roi" />
+    <remap from="visual_tracker_reset" to="cftld/reset" />
+    <remap from="visual_tracker_init" to="cftld/init_roi" />
+    <remap from="visual_servo_enable" to="vservo/enable" />
+    <remap from="visual_servo_roi" to="vservo/roi" />
     <rosparam command="load" file="$(arg param_file)" />
   </node>
 </launch>

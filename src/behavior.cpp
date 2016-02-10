@@ -14,8 +14,10 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     sub_joy_(nh_, "joy", 10),
     sub_periodic_tracks_(nh_, "periodic_tracks", 1),
     sub_visual_tracker_track_(nh_, "visual_tracker_track", 1),
-    pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("reset_visual_tracker", 1, true)),
-    pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("init_visual_tracker", 1, true)),
+    pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("visual_tracker_reset", 1, true)),
+    pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
+    pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
+    pub_visual_servo_roi_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_servo_roi", 1, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_IDLE),
     bebop_prev_mode_(constants::MODE_IDLE),
@@ -126,7 +128,7 @@ void BebopBehaviorNode::UpdateBehavior()
       const sensor_msgs::RegionOfInterest& roi = sub_periodic_tracks_.GetMsgCopy();
       ROS_INFO_STREAM("[BEH] Obzerver found a stationary periodic track [x, y, w, h]: "
                       << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
-      pub_cftld_tracker_init_.publish(roi);      
+      pub_cftld_tracker_init_.publish(roi);
     }
 
     // TODO: Add confidence
@@ -146,7 +148,10 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
-      ; // TODO: Enable Visual Servo
+      ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
+      std_msgs::Bool bool_msg;
+      bool_msg.data = true;
+      pub_visual_servo_enable_.publish(bool_msg);
     }
 
     if (!sub_visual_tracker_track_.IsActive())
@@ -164,8 +169,11 @@ void BebopBehaviorNode::UpdateBehavior()
     if (t.status != cftld_ros::Track::STATUS_TRACKING)
     {
       ROS_WARN("[BEH] Tracker has lost the person");
-      // TODO: Disable visual servo
       bebop_mode_ = constants::MODE_APPROACHING_LOST;
+    }
+    else
+    {
+      pub_visual_servo_roi_.publish(t.roi);
     }
 
     break;
@@ -173,6 +181,14 @@ void BebopBehaviorNode::UpdateBehavior()
 
   case constants::MODE_APPROACHING_LOST:
   {
+    if (is_transition)
+    {
+      ROS_INFO_STREAM("[BEH] Disabling visual servo ...");
+      std_msgs::Bool bool_msg;
+      bool_msg.data = true;
+      pub_visual_servo_enable_.publish(bool_msg);
+    }
+
     bebop_mode_ = constants::MODE_IDLE;
     break;
   }

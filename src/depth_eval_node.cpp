@@ -785,6 +785,7 @@ int main(int argc, char* argv[])
 
         const double pitch_ref = pid_vx.computeCommand(v[2] - velx_model->GetVel(), dt);
         const double roll_ref = pid_vy.computeCommand(-v[0] - vely_model->GetVel(), dt);
+
         v_beb[0] =  pitch_ref / beb_maxtilt_rad;
         v_beb[1] =  roll_ref / beb_maxtilt_rad;
 

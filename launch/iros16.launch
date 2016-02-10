@@ -11,6 +11,18 @@
     <arg name="param_file" value="$(find bebop_hri)/config/behavior.yaml" />
   </include>
 
+  <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">
+    <arg name="param_file" value="$(find bebop_vel_ctrl)/config/bebop_vel_ctrl.yaml" />
+    <arg name="output" value="screen" />
+    <arg name="input_topic" value="vservo/cmd_vel" />
+    <arg name="output_topic" value="velctrl/cmd_vel" />
+  </include>
+
+  <include file="$(find bebop_vservo)/launch/bebop_vservo.launch">
+    <arg name="param_file" value="$(find bebop_vservo)/config/bebop_vservo.yaml" />
+    <arg name="output" value="screen" />
+  </include>
+
   <!-- nodelets -->
   <node pkg="nodelet" type="nodelet" args="manager" name="bebop_nodelet_manager" output="$(arg nodelets_output)">
     <param name="num_worker_threads" value="4" />

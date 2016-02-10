@@ -64,6 +64,7 @@ protected:
 
   // To enable/disable visual servo
   ros::Publisher pub_visual_servo_enable_;
+  ros::Publisher pub_visual_servo_roi_;
 
   // To enable/disable obzerver
   ros::Publisher pub_obzerver_enable_;
