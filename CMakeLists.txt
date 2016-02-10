@@ -17,6 +17,8 @@ find_package(catkin REQUIRED COMPONENTS
   visp_bridge
   control_toolbox
   cftld_ros
+  bebop_vel_ctrl
+  bebop_vservo
 )
 
 find_package(OpenCV REQUIRED)

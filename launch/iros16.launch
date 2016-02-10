@@ -17,7 +17,7 @@
 
   <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">
     <arg name="param_file" value="$(find bebop_vel_ctrl)/config/bebop_vel_ctrl.yaml" />
-    <arg name="output" value="screen" />
+    <arg name="output" value="log" />
     <arg name="input_topic" value="vservo/cmd_vel" />
     <arg name="output_topic" value="velctrl/cmd_vel" />
   </include>
