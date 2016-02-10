@@ -17,7 +17,7 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("visual_tracker_reset", 1, true)),
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
-    pub_visual_servo_roi_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_servo_roi", 1, true)),
+    pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_taregt", 1, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_IDLE),
     bebop_prev_mode_(constants::MODE_IDLE),
@@ -35,6 +35,9 @@ void BebopBehaviorNode::UpdateParams()
   util::get_param(priv_nh_, "joy_override_buttion", param_joy_override_button_, 7);
   util::get_param(priv_nh_, "joy_override_timeout", param_joy_override_timeout_, 20.0);
   util::get_param(priv_nh_, "idle_timeout", param_idle_timeout_, 10.0);
+  util::get_param(priv_nh_, "servo_desired_depth", param_servo_desired_depth_, 2.5);
+  util::get_param(priv_nh_, "target_height", param_target_height_, 0.5);
+  util::get_param(priv_nh_, "target_dist_ground", param_target_dist_ground_, 0.75);
 }
 
 void BebopBehaviorNode::Reset()
@@ -65,6 +68,7 @@ void BebopBehaviorNode::UpdateBehavior()
   sub_joy_.DeactivateIfOlderThan(1.0);
   sub_periodic_tracks_.DeactivateIfOlderThan(1.0);
   sub_visual_tracker_track_.DeactivateIfOlderThan(1.0);
+  sub_bebop_att_.DeactivateIfOlderThan(1.0);
 
   // Emergency behavior is implemented way down the pipeline, in cmd_vel_mux layer
   // regardless of the current mode, is joy_override_button is pressed, we will pause execution
@@ -173,7 +177,16 @@ void BebopBehaviorNode::UpdateBehavior()
     }
     else
     {
-      pub_visual_servo_roi_.publish(t.roi);
+      msg_vservo_target_.header.stamp = ros::Time::now();
+      msg_vservo_target_.reinit = is_transition;
+      msg_vservo_target_.desired_depth = param_servo_desired_depth_;
+      msg_vservo_target_.target_distance_ground = param_target_dist_ground_;
+      msg_vservo_target_.target_height = param_target_height_;
+      msg_vservo_target_.roi = t.roi;
+      // vservo node will cache this value on its first call or when reinit=true
+      // ignores it all other time
+      msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
+      pub_visual_servo_target_.publish(msg_vservo_target_);
     }
 
     break;

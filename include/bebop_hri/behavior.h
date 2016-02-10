@@ -10,6 +10,8 @@
 // This is a placeholder for obzerver
 #include <sensor_msgs/RegionOfInterest.h>
 #include "cftld_ros/Track.h"
+#include "bebop_vservo/Target.h"
+#include "bebop_msgs/Ardrone3PilotingStateAttitudeChanged.h"
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
@@ -57,6 +59,7 @@ protected:
   behavior_tools::ASyncSub<sensor_msgs::Joy> sub_joy_;
   behavior_tools::ASyncSub<sensor_msgs::RegionOfInterest> sub_periodic_tracks_;
   behavior_tools::ASyncSub<cftld_ros::Track> sub_visual_tracker_track_;
+  behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAttitudeChanged> sub_bebop_att_;
 
   // To reset/initialize the visualal tracker
   ros::Publisher pub_cftld_tracker_reset_;
@@ -64,7 +67,7 @@ protected:
 
   // To enable/disable visual servo
   ros::Publisher pub_visual_servo_enable_;
-  ros::Publisher pub_visual_servo_roi_;
+  ros::Publisher pub_visual_servo_target_;
 
   // To enable/disable obzerver
   ros::Publisher pub_obzerver_enable_;
@@ -74,6 +77,7 @@ protected:
   // Messages
   std_msgs::Empty msg_empty_;
   std_msgs::Bool msg_bool_;
+  bebop_vservo::Target msg_vservo_target_;
 
   // internal stuff
   constants::bebop_mode_t bebop_mode_;
@@ -88,6 +92,9 @@ protected:
   int32_t param_joy_override_button_;
   double param_idle_timeout_;
   double param_joy_override_timeout_;
+  double param_target_height_;
+  double param_target_dist_ground_;
+  double param_servo_desired_depth_;
 
   void Reset();
   void UpdateParams();

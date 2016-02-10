@@ -8,7 +8,7 @@
 topics:
 -
   name    : navigation
-  topic   : bebop_hri/cmd_vel
+  topic   : velctrl/cmd_vel
   timeout : 0.5
   priority: 10
 -
