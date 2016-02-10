@@ -199,7 +199,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Disabling visual servo ...");
       std_msgs::Bool bool_msg;
-      bool_msg.data = true;
+      bool_msg.data = false;
       pub_visual_servo_enable_.publish(bool_msg);
     }
 
