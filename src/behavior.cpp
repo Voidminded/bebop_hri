@@ -118,7 +118,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (is_transition)
     {
       Reset();
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "cyan", "magenta", 0.1);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "green", "cyan", 0.6);
     }
     if (mode_duration.toSec() > param_idle_timeout_)
     {
@@ -164,7 +164,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_ERROR("[BEH] Video STALE mode");
       ToggleVisualServo(false);
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_CONST_3, "red", "magenta", 1.0);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "red", "magenta", 1.2);
     }
 
     if (sub_camera_info_.GetFreshness().toSec() < 0.05)
@@ -218,6 +218,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
       ToggleVisualServo(true);
+      view_angle_ = 360;
     }
     int new_angle_ = 180.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
                              /sub_camera_info_()->width)-0.5);
