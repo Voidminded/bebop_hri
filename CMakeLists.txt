@@ -6,23 +6,16 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   sensor_msgs
-  image_transport
-  cv_bridge
   message_filters
-  image_geometry
   angles
   geometry_msgs
-  tf2
   message_generation
-  visp_bridge
-  control_toolbox
   cftld_ros
   bebop_vel_ctrl
   bebop_vservo
+  autonomy_leds_msgs
 )
 
-find_package(OpenCV REQUIRED)
-find_package(VISP REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -81,6 +74,7 @@ add_message_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  autonomy_leds_msgs
 )
 
 ################################################
@@ -129,8 +123,8 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
-  ${VISP_INCLUDE_DIRS}
+#  ${OpenCV_INCLUDE_DIRS}
+#  ${VISP_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -144,15 +138,15 @@ include_directories(
 # add_dependencies(bebop_hri ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(depth_eval_node src/depth_eval_node.cpp)
+#add_executable(depth_eval_node src/depth_eval_node.cpp)
 
-add_dependencies(depth_eval_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+#add_dependencies(depth_eval_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-target_link_libraries(depth_eval_node
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBRARIES}
-  ${VISP_LIBRARIES}
-)
+#target_link_libraries(depth_eval_node
+#  ${catkin_LIBRARIES}
+#  ${OpenCV_LIBRARIES}
+#  ${VISP_LIBRARIES}
+#)
 
 add_library(bebop_hri_utils src/util.cpp)
 target_link_libraries(bebop_hri_utils

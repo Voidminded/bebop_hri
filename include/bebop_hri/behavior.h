@@ -7,6 +7,8 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
+#include <autonomy_leds_msgs/Feedback.h>
+#include <map>
 
 // This is a placeholder for obzerver
 #include <sensor_msgs/RegionOfInterest.h>
@@ -50,7 +52,53 @@ const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 
 }  // namespace constants
 
+namespace feedback
+{
+class FeedbackGenerator
+{
+protected:
+  ros::NodeHandle nh_;
 
+private:
+  // To send LED feedback
+  ros::Publisher pub_led_feedback_;
+  std::map<std::string, std_msgs::ColorRGBA> colors;
+  autonomy_leds_msgs::Feedback msg_led_feedback_;
+
+  void initColors()
+  {
+    std_msgs::ColorRGBA c;
+    c.r = 0.0, c.g = 0.9, c.b = 0.0, colors["green"] = c;
+    c.r = 0.9, c.g = 0.0, c.b = 0.0, colors["red"] = c;
+    c.r = 0.0, c.g = 0.0, c.b = 0.9, colors["blue"] = c;
+    c.r = 0.0, c.g = 0.9, c.b = 0.9, colors["cyan"] = c;
+    c.r = 0.9, c.g = 0.0, c.b = 0.0, colors["magenta"] = c;
+    c.r = 0.9, c.g = 0.9, c.b = 0.0, colors["yellow"] = c;
+    c.r = 0.9, c.g = 0.9, c.b = 0.9, colors["white"] = c;
+  }
+
+
+public:
+  FeedbackGenerator(ros::NodeHandle& nh)
+  : nh_(nh),
+    pub_led_feedback_(nh_.advertise<autonomy_leds_msgs::Feedback>("leds/feedback", 1, true))
+  {
+    initColors();
+  }
+
+  void SendFeedback(const int type_, const std::string center_color_,
+                    const std::string arrow_color_, const double freq_, const double val_ = 0)
+  {
+    msg_led_feedback_.center_color = colors[center_color_];
+    msg_led_feedback_.arrow_color = colors[arrow_color_];
+    msg_led_feedback_.freq = freq_;
+    msg_led_feedback_.anim_type = type_;
+    msg_led_feedback_.value = val_;
+    pub_led_feedback_.publish( msg_led_feedback_);
+  }
+
+};
+}  // namespace feedback
 
 class BebopBehaviorNode
 {
@@ -91,6 +139,10 @@ protected:
   constants::bebop_mode_t bebop_resume_mode_;
 
   ros::Time last_transition_time_;
+
+  // Feedback generator and variables
+  feedback::FeedbackGenerator led_feedback_;
+  int view_angle_;
 
   // params
   double param_update_rate_;
