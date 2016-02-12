@@ -6,24 +6,16 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   std_msgs
   sensor_msgs
-  image_transport
- # cv_bridge
   message_filters
- # image_geometry
   angles
   geometry_msgs
- # tf2
   message_generation
- # visp_bridge
- # control_toolbox
   cftld_ros
   bebop_vel_ctrl
   bebop_vservo
   autonomy_leds_msgs
 )
 
-#find_package(OpenCV REQUIRED)
-#find_package(VISP REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
