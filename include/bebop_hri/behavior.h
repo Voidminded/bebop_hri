@@ -7,6 +7,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
+#include <autonomy_leds_msgs/Feedback.h>
 
 // This is a placeholder for obzerver
 #include <sensor_msgs/RegionOfInterest.h>
@@ -48,9 +49,12 @@ const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 
 #define BEBOP_MODE_STR(x) (::bebop_hri::constants::STR_BEBOP_MODE_MAP[x])
 
+namespace color
+{
+  std_msgs::ColorRGBA green, red, blue, cyan, magenta, yellow, white;
+} // constants::namespace color
+
 }  // namespace constants
-
-
 
 class BebopBehaviorNode
 {
@@ -76,12 +80,16 @@ protected:
   // To enable/disable obzerver
   ros::Publisher pub_obzerver_enable_;
 
+  // To send LED feedback
+  ros::Publisher pub_led_feedback_;
+
   util::StringPublisher status_publisher_;
 
   // Messages
   std_msgs::Empty msg_empty_;
   std_msgs::Bool msg_bool_;
   bebop_vservo::Target msg_vservo_target_;
+  autonomy_leds_msgs::Feedback msg_led_feedback_;
 
   // internal stuff
   constants::bebop_mode_t bebop_mode_;  // current bebop state
@@ -91,6 +99,8 @@ protected:
   constants::bebop_mode_t bebop_resume_mode_;
 
   ros::Time last_transition_time_;
+
+  int view_angle_;
 
   // params
   double param_update_rate_;
@@ -104,6 +114,8 @@ protected:
   double param_stale_video_timeout_;
 
   void ToggleVisualServo(const bool enable);
+  void InitColors();
+  void SendFeedback( const constants::bebop_mode_t state, const double value = 0);
 
   void Reset();
   void UpdateParams();
