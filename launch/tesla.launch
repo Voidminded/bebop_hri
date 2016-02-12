@@ -1,0 +1,22 @@
+<?xml version="1.0" ?>
+<launch>
+  <env name="ROSLAUNCH_SSH_UNKNOWN" value="1" />
+  <machine name="tesla" address="tesla" env-loader="/home/edison/catkin_ws/devel/setup.bash" user="edison" />
+  <node machine="tesla" pkg="rosserial_server" type="serial_node" name="rosserial_server">
+    <rosparam>
+      port: /dev/led_strip
+      baud: 115200
+      require:
+        publishers: []
+        subscribers: [leds/set, leds/set_led]
+    </rosparam>
+  </node>
+  <node machine="tesla" pkg="rosserial_python" type="message_info_service.py" name="rosserial_message_info" />
+  <node machine="tesla" pkg="autonomy_leds_tools" type="leds_animation_engine_node" name="leds_animation_engine_node" output="screen">
+    <param name="update_rate" value="100" />
+    <param name="num_leds" value="9" />
+  </node>
+  <node machine="tesla" pkg="autonomy_leds_tools" type="bebop_api_node" name="bebop_api_node" output="screen">
+  </node>
+</launch>
+
