@@ -20,17 +20,16 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
-    pub_led_feedback_(nh_.advertise<autonomy_leds_msgs::Feedback>("leds/feedback", 1, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_IDLE),
     bebop_mode_prev_(constants::MODE_IDLE),
     bebop_mode_prev_update_(constants::MODE_IDLE),
     bebop_resume_mode_(constants::MODE_IDLE),
-    last_transition_time_(ros::Time::now())
+    last_transition_time_(ros::Time::now()),
+    led_feedback_(nh_)
 {
   UpdateParams();
   Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
-  InitColors();
 }
 
 void BebopBehaviorNode::UpdateParams()
@@ -58,73 +57,6 @@ void BebopBehaviorNode::ToggleVisualServo(const bool enable)
   std_msgs::Bool bool_msg;
   bool_msg.data = enable;
   pub_visual_servo_enable_.publish(bool_msg);
-}
-
-void BebopBehaviorNode::InitColors()
-{
-  constants::color::green.r = 0.0, constants::color::green.g = 0.9, constants::color::green.b = 0.0;
-  constants::color::red.r = 0.9, constants::color::red.g = 0.0, constants::color::red.b = 0.0;
-  constants::color::blue.r = 0.0, constants::color::blue.g = 0.0, constants::color::blue.b = 0.9;
-  constants::color::cyan.r = 0.0, constants::color::cyan.g = 0.9, constants::color::cyan.b = 0.9;
-  constants::color::magenta.r = 0.9, constants::color::magenta.g = 0.0, constants::color::magenta.b = 0.0;
-  constants::color::yellow.r = 0.9, constants::color::yellow.g = 0.9, constants::color::yellow.b = 0.0;
-  constants::color::white.r = 0.9, constants::color::white.g = 0.9, constants::color::white.b = 0.9;
-}
-
-void BebopBehaviorNode::SendFeedback(const constants::bebop_mode_t state, const double value)
-{
-  switch (state)
-  {
-  case constants::MODE_IDLE:
-  {
-    msg_led_feedback_.center_color = constants::color::cyan;
-    msg_led_feedback_.arrow_color = constants::color::magenta;
-    msg_led_feedback_.anim_type = autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK;
-    msg_led_feedback_.freq = 0.5;
-    break;
-  }
-  case constants::MODE_MANUAL:
-  {
-    msg_led_feedback_.center_color = constants::color::red;
-    msg_led_feedback_.arrow_color = constants::color::yellow;
-    msg_led_feedback_.anim_type = autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK;
-    msg_led_feedback_.freq = 30;
-    break;
-  }
-  case constants::MODE_BAD_VIDEO:
-  {
-    msg_led_feedback_.center_color = constants::color::red;
-    msg_led_feedback_.arrow_color = constants::color::magenta;
-    msg_led_feedback_.anim_type = autonomy_leds_msgs::Feedback::TYPE_SEARCH_1;
-    msg_led_feedback_.freq = 3;
-    break;
-  }
-  case constants::MODE_SEARCHING:
-  {
-    msg_led_feedback_.center_color = constants::color::green;
-    msg_led_feedback_.arrow_color = constants::color::blue;
-    msg_led_feedback_.anim_type = autonomy_leds_msgs::Feedback::TYPE_SEARCH_2;
-    msg_led_feedback_.freq = 1;
-    break;
-  }
-  case constants::MODE_APPROACHING_PERSON:
-  {
-    msg_led_feedback_.center_color = constants::color::green;
-    msg_led_feedback_.arrow_color = constants::color::blue;
-    msg_led_feedback_.anim_type = autonomy_leds_msgs::Feedback::TYPE_LOOK_AT;
-    msg_led_feedback_.freq = 100;
-    msg_led_feedback_.value = value;
-    break;
-  }
-  default:
-  {
-    msg_led_feedback_.center_color = constants::color::cyan;
-    msg_led_feedback_.arrow_color = constants::color::magenta;
-    msg_led_feedback_.anim_type = autonomy_leds_msgs::Feedback::TYPE_SEARCH_2;
-    msg_led_feedback_.freq = 60;
-  }
-  }
-  pub_led_feedback_.publish( msg_led_feedback_);
 }
 
 void BebopBehaviorNode::UpdateBehavior()
@@ -185,7 +117,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (is_transition)
     {
       Reset();
-      SendFeedback( constants::MODE_IDLE);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "cyan", "magenta", 0.5);
     }
     if (mode_duration.toSec() > param_idle_timeout_)
     {
@@ -208,7 +140,7 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
-      SendFeedback(constants::MODE_MANUAL, 0);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "red", "yellow", 30);
     }
     if (mode_duration.toSec() > param_joy_override_timeout_ &&
         bebop_resume_mode_ != constants::MODE_IDLE)
@@ -231,7 +163,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_ERROR("[BEH] Video STALE mode");
       ToggleVisualServo(false);
-      SendFeedback(constants::MODE_BAD_VIDEO);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "red", "magenta", 3.0);
     }
 
     if (mode_duration.toSec() > param_stale_video_timeout_)
@@ -256,7 +188,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (is_transition)
     {
       ; // TODO: Enable obzerver
-      SendFeedback(constants::MODE_SEARCHING);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_2, "green", "blue", 3);
     }
     if (sub_periodic_tracks_.IsActive())
     {
@@ -286,12 +218,12 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
       ToggleVisualServo(true);
     }
-    if( view_angle_ != 120.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
-        /sub_camera_info_()->width)-0.5))
+    int new_angle_ = 120.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
+                             /sub_camera_info_()->width)-0.5);
+    if( view_angle_ != new_angle_)
     {
-      view_angle_ = (((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
-                      /sub_camera_info_()->width)-0.5);
-      SendFeedback(constants::MODE_APPROACHING_PERSON, view_angle_);
+      view_angle_ = new_angle_;
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT, "green", "blue", 90, view_angle_);
     }
     // Visual tracker's inactiviy is either caused by input stream's being stale or
     // a crash. The former needs a seperate recovery case since this node can also detects it.
@@ -343,6 +275,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Target lost during approach, waiting for a while ...");
       ToggleVisualServo(false);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_2, "cyan", "magenta", 60);
     }
 
     if (mode_duration.toSec() > 10.0)

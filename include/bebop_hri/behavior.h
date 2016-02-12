@@ -8,6 +8,7 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
 #include <autonomy_leds_msgs/Feedback.h>
+#include <map>
 
 // This is a placeholder for obzerver
 #include <sensor_msgs/RegionOfInterest.h>
@@ -49,12 +50,55 @@ const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 
 #define BEBOP_MODE_STR(x) (::bebop_hri::constants::STR_BEBOP_MODE_MAP[x])
 
-namespace color
-{
-  std_msgs::ColorRGBA green, red, blue, cyan, magenta, yellow, white;
-} // constants::namespace color
-
 }  // namespace constants
+
+namespace feedback
+{
+class FeedbackGenerator
+{
+protected:
+  ros::NodeHandle nh_;
+
+private:
+  // To send LED feedback
+  ros::Publisher pub_led_feedback_;
+  std::map<std::string, std_msgs::ColorRGBA> colors;
+  autonomy_leds_msgs::Feedback msg_led_feedback_;
+
+  void initColors()
+  {
+    std_msgs::ColorRGBA c;
+    c.r = 0.0, c.g = 0.9, c.b = 0.0, colors["green"] = c;
+    c.r = 0.9, c.g = 0.0, c.b = 0.0, colors["red"] = c;
+    c.r = 0.0, c.g = 0.0, c.b = 0.9, colors["blue"] = c;
+    c.r = 0.0, c.g = 0.9, c.b = 0.9, colors["cyan"] = c;
+    c.r = 0.9, c.g = 0.0, c.b = 0.0, colors["magenta"] = c;
+    c.r = 0.9, c.g = 0.9, c.b = 0.0, colors["yellow"] = c;
+    c.r = 0.9, c.g = 0.9, c.b = 0.9, colors["white"] = c;
+  }
+
+
+public:
+  FeedbackGenerator(ros::NodeHandle& nh)
+  : nh_(nh),
+    pub_led_feedback_(nh_.advertise<autonomy_leds_msgs::Feedback>("leds/feedback", 1, true))
+  {
+    initColors();
+  }
+
+  void SendFeedback(const int type_, const std::string center_color_,
+                    const std::string arrow_color_, const double freq_, const double val_ = 0)
+  {
+    msg_led_feedback_.center_color = colors[center_color_];
+    msg_led_feedback_.arrow_color = colors[arrow_color_];
+    msg_led_feedback_.freq = freq_;
+    msg_led_feedback_.anim_type = type_;
+    msg_led_feedback_.value = val_;
+    pub_led_feedback_.publish( msg_led_feedback_);
+  }
+
+};
+}  // namespace feedback
 
 class BebopBehaviorNode
 {
@@ -80,16 +124,12 @@ protected:
   // To enable/disable obzerver
   ros::Publisher pub_obzerver_enable_;
 
-  // To send LED feedback
-  ros::Publisher pub_led_feedback_;
-
   util::StringPublisher status_publisher_;
 
   // Messages
   std_msgs::Empty msg_empty_;
   std_msgs::Bool msg_bool_;
   bebop_vservo::Target msg_vservo_target_;
-  autonomy_leds_msgs::Feedback msg_led_feedback_;
 
   // internal stuff
   constants::bebop_mode_t bebop_mode_;  // current bebop state
@@ -100,6 +140,8 @@ protected:
 
   ros::Time last_transition_time_;
 
+  // Feedback generator and variables
+  feedback::FeedbackGenerator led_feedback_;
   int view_angle_;
 
   // params
@@ -114,8 +156,6 @@ protected:
   double param_stale_video_timeout_;
 
   void ToggleVisualServo(const bool enable);
-  void InitColors();
-  void SendFeedback( const constants::bebop_mode_t state, const double value = 0);
 
   void Reset();
   void UpdateParams();
