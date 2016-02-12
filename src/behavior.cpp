@@ -286,11 +286,11 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
       ToggleVisualServo(true);
     }
-    if( view_angle_ != 60.0*(double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
-        /sub_camera_info_()->width)
+    if( view_angle_ != 120.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
+        /sub_camera_info_()->width)-0.5))
     {
-      view_angle_ = 60.0*(double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
-              /sub_camera_info_()->width;
+      view_angle_ = (((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
+                      /sub_camera_info_()->width)-0.5);
       SendFeedback(constants::MODE_APPROACHING_PERSON, view_angle_);
     }
     // Visual tracker's inactiviy is either caused by input stream's being stale or
