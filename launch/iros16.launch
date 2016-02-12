@@ -3,6 +3,7 @@
   <arg name="joy_dev" default="/dev/input/js0" />
   <arg name="nodelets_output" default="log" />
   <arg name="is_bag" default="false" />
+  <arg name="plot_servo" default="false" />
 
   <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
 
@@ -25,6 +26,7 @@
   <include file="$(find bebop_vservo)/launch/bebop_vservo.launch">
     <arg name="param_file" value="$(find bebop_vservo)/config/bebop_vservo.yaml" />
     <arg name="output" value="screen" />
+    <arg name="plot" value="$(arg plot_servo)" />
   </include>
 
   <node pkg="twist_mux" type="twist_mux" name="twist_mux" output="screen">

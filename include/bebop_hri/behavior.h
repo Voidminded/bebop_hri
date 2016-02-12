@@ -84,8 +84,10 @@ protected:
   bebop_vservo::Target msg_vservo_target_;
 
   // internal stuff
-  constants::bebop_mode_t bebop_mode_;
-  constants::bebop_mode_t bebop_prev_mode_;
+  constants::bebop_mode_t bebop_mode_;  // current bebop state
+  constants::bebop_mode_t bebop_mode_prev_;  // prev bebop state
+  constants::bebop_mode_t bebop_mode_prev_update_; // bebop state in previous timestep
+
   constants::bebop_mode_t bebop_resume_mode_;
 
   ros::Time last_transition_time_;
@@ -106,6 +108,11 @@ protected:
   void Reset();
   void UpdateParams();
   void UpdateBehavior();
+  inline void Transition(const constants::bebop_mode_t& new_mode)
+  {
+    bebop_mode_prev_ = bebop_mode_;
+    bebop_mode_ = new_mode;
+  }
 
 public:
   BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle &priv_nh);

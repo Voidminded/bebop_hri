@@ -22,12 +22,13 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_IDLE),
-    bebop_prev_mode_(constants::MODE_IDLE),
+    bebop_mode_prev_(constants::MODE_IDLE),
+    bebop_mode_prev_update_(constants::MODE_IDLE),
     bebop_resume_mode_(constants::MODE_IDLE),
     last_transition_time_(ros::Time::now())
 {
   UpdateParams();
-  bebop_mode_ = static_cast<constants::bebop_mode_t>(param_init_mode_);
+  Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
 }
 
 void BebopBehaviorNode::UpdateParams()
@@ -59,11 +60,11 @@ void BebopBehaviorNode::ToggleVisualServo(const bool enable)
 
 void BebopBehaviorNode::UpdateBehavior()
 {
-  const bool is_transition = (bebop_mode_ != bebop_prev_mode_);
+  const bool is_transition = (bebop_mode_ != bebop_mode_prev_update_);
   if (is_transition)
   {
     ROS_WARN("[BEH] State Transitioned (%s -> %s)",
-             BEBOP_MODE_STR(bebop_prev_mode_).c_str(),
+             BEBOP_MODE_STR(bebop_mode_prev_).c_str(),
              BEBOP_MODE_STR(bebop_mode_).c_str());
     last_transition_time_ = ros::Time::now();
   }
@@ -73,10 +74,10 @@ void BebopBehaviorNode::UpdateBehavior()
   status_publisher_ << "Current State: '" << constants::STR_BEBOP_MODE_MAP[bebop_mode_].c_str() << "'";
   status_publisher_ << " Duration: " << mode_duration.toSec();
 
-  bebop_prev_mode_ = bebop_mode_;
-
   ROS_DEBUG_THROTTLE(1 , "[BEH] %s", status_publisher_.GetBuffer().str().c_str());
   status_publisher_.Publish();
+
+  bebop_mode_prev_update_ = bebop_mode_;
 
   // Deactivate all async subs if they are not fresh enough
   sub_joy_.DeactivateIfOlderThan(1.0);
@@ -93,7 +94,7 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     ROS_WARN("[BEH] Joystick override detected");
     bebop_resume_mode_ = bebop_mode_;
-    bebop_mode_ = constants::MODE_MANUAL;
+    Transition(constants::MODE_MANUAL);
     return;
   }
 
@@ -104,7 +105,7 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     ROS_ERROR("[BEH] Video feed is stale");
     bebop_resume_mode_ = bebop_mode_;
-    bebop_mode_ = constants::MODE_BAD_VIDEO;
+    Transition(constants::MODE_BAD_VIDEO);
     return;
   }
 
@@ -118,13 +119,13 @@ void BebopBehaviorNode::UpdateBehavior()
     }
     if (mode_duration.toSec() > param_idle_timeout_)
     {
-      bebop_mode_ = static_cast<constants::bebop_mode_t>(param_init_mode_);
+      Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
 
       // Avoid deadlock, if the user has not specified a default starting state,
       // perfrom searching
       if (bebop_mode_ == constants::MODE_IDLE)
       {
-        bebop_mode_ = constants::MODE_SEARCHING;
+        Transition(constants::MODE_SEARCHING);
       }
 
       ROS_INFO_STREAM("[BEH] Idle timeout, transitioning to initial state: " <<
@@ -145,7 +146,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (sub_joy_.IsActive() && !sub_joy_()->buttons[param_joy_override_button_])
     {
       ROS_WARN_STREAM("[BEH] Joystick override ended, going back to " << BEBOP_MODE_STR(bebop_resume_mode_));
-      bebop_mode_ = bebop_resume_mode_;
+      Transition(bebop_resume_mode_);
     }
     break;
   }
@@ -169,7 +170,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (sub_camera_info_.GetFreshness().toSec() < 0.05)
     {
       ROS_WARN_STREAM("[BEH] Video is good again!");
-      bebop_mode_ = bebop_resume_mode_;
+      Transition(bebop_resume_mode_);
       break;
     }
 
@@ -197,7 +198,7 @@ void BebopBehaviorNode::UpdateBehavior()
       const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
       ROS_INFO_STREAM("[BEH] Visual tracker has been initialized. Approaching her ... id: "
                       <<  t.uid << " confidence: " << t.confidence);
-      bebop_mode_ = constants::MODE_APPROACHING_PERSON;
+      Transition(constants::MODE_APPROACHING_PERSON);
     }
     break;
   }
@@ -217,7 +218,7 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_ERROR_STREAM("[BEH] Visual tracker is stale, this should never happen.");
 
       // TODO: Disable visual servo
-      bebop_mode_ = constants::MODE_APPROACHING_LOST;
+      Transition(constants::MODE_APPROACHING_LOST);
       break;
     }
 
@@ -227,12 +228,20 @@ void BebopBehaviorNode::UpdateBehavior()
     if (t.status != cftld_ros::Track::STATUS_TRACKING)
     {
       ROS_WARN("[BEH] Tracker has lost the person");
-      bebop_mode_ = constants::MODE_APPROACHING_LOST;
+      Transition(constants::MODE_APPROACHING_LOST);
     }
     else
     {
       msg_vservo_target_.header.stamp = ros::Time::now();
-      msg_vservo_target_.reinit = is_transition;
+
+      // re-initialize the servo, only when in mode transition and not from a previous override mode
+
+      msg_vservo_target_.reinit = static_cast<bool>(is_transition &&
+                                   (bebop_mode_prev_ != constants::MODE_BAD_VIDEO) &&
+                                   (bebop_mode_prev_ != constants::MODE_MANUAL) &&
+                                   (bebop_mode_prev_ != constants::MODE_APPROACHING_LOST)
+                                   );
+
       msg_vservo_target_.desired_depth = param_servo_desired_depth_;
       msg_vservo_target_.target_distance_ground = param_target_dist_ground_;
       msg_vservo_target_.target_height = param_target_height_;
@@ -257,14 +266,14 @@ void BebopBehaviorNode::UpdateBehavior()
     if (mode_duration.toSec() > 10.0)
     {
       ROS_WARN("[BEH] Recovery failed");
-      bebop_mode_ = constants::MODE_IDLE;
+      Transition(constants::MODE_IDLE);
     }
 
     if (sub_visual_tracker_track_.IsActive() &&
         sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING)
     {
       ROS_INFO("[BEH] Recovery has been succesful");
-      bebop_mode_ = constants::MODE_APPROACHING_PERSON;
+      Transition(constants::MODE_APPROACHING_PERSON);
     }
     break;
   }
