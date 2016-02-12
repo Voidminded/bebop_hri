@@ -9,6 +9,7 @@
     <remap from="visual_tracker_init" to="cftld/init_roi" />
     <remap from="visual_servo_enable" to="vservo/enable" />
     <remap from="visual_servo_target" to="vservo/target" />
+    <remap from="joy" to="bebop/joy" />
     <rosparam command="load" file="$(arg param_file)" />
   </node>
 </launch>

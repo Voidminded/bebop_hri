@@ -5,3 +5,4 @@
 - git: { local-name: bebop_vservo, uri: 'https://bitbucket.org/AutonomyLab/bebop_vservo.git', version: master}
 - git: {local-name: cftld_ros, uri: 'https://bitbucket.org/AutonomyLab/cftld_ros.git', version: master}
 - git: {local-name: rqt_common_plugins, uri: 'https://github.com/Voidminded/rqt_common_plugins.git', version: master}
+- git: {local-name: cv_bridge, uri: 'https://github.com/AutonomyLab/vision_opencv', version: indigo}

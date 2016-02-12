@@ -4,6 +4,7 @@
 
 #include <ros/ros.h>
 #include <sensor_msgs/Joy.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
 
@@ -33,14 +34,16 @@ enum bebop_mode_t
   MODE_FOLLOWING_PERSON = 6,
   MODE_CLOSERANGE_ENGAGED = 7,
   MODE_MANUAL = 8,
+  MODE_BAD_VIDEO = 9,
   MODE_NUM
 };
 
 const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 {
   "Idle", "Searching", "Long-range Engaging", "Long-range Engaged",
-  "Approaching The person", "Following The Person", "Lost The Person", "Close-range Engaged",
-  "Manual (Joy Override)","NAN"
+  "Approaching The person", "Lost The Person", "Following The Person",
+  "Close-range Engaged",
+  "Manual (Joy Override)", "Stale Video", "NAN"
 };
 
 #define BEBOP_MODE_STR(x) (::bebop_hri::constants::STR_BEBOP_MODE_MAP[x])
@@ -60,6 +63,7 @@ protected:
   behavior_tools::ASyncSub<sensor_msgs::RegionOfInterest> sub_periodic_tracks_;
   behavior_tools::ASyncSub<cftld_ros::Track> sub_visual_tracker_track_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAttitudeChanged> sub_bebop_att_;
+  behavior_tools::ASyncSub<sensor_msgs::CameraInfo> sub_camera_info_;
 
   // To reset/initialize the visualal tracker
   ros::Publisher pub_cftld_tracker_reset_;
@@ -95,6 +99,9 @@ protected:
   double param_target_height_;
   double param_target_dist_ground_;
   double param_servo_desired_depth_;
+  double param_stale_video_timeout_;
+
+  void ToggleVisualServo(const bool enable);
 
   void Reset();
   void UpdateParams();

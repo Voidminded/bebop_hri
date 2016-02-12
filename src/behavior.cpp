@@ -15,6 +15,7 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     sub_periodic_tracks_(nh_, "periodic_tracks", 1),
     sub_visual_tracker_track_(nh_, "visual_tracker_track", 1),
     sub_bebop_att_(nh_, "bebop/states/ARDrone3/PilotingState/AttitudeChanged", 10),
+    sub_camera_info_(nh_, "bebop/camera_info", 1),
     pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("visual_tracker_reset", 1, true)),
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
@@ -39,12 +40,21 @@ void BebopBehaviorNode::UpdateParams()
   util::get_param(priv_nh_, "servo_desired_depth", param_servo_desired_depth_, 2.5);
   util::get_param(priv_nh_, "target_height", param_target_height_, 0.5);
   util::get_param(priv_nh_, "target_dist_ground", param_target_dist_ground_, 0.75);
+  util::get_param(priv_nh_, "stale_video_timeout", param_stale_video_timeout_, 10.0);
 }
 
 void BebopBehaviorNode::Reset()
 {
   ROS_WARN("[BEH] Behavior Reset");
   pub_cftld_tracker_reset_.publish(msg_empty_);
+  ToggleVisualServo(false);
+}
+
+void BebopBehaviorNode::ToggleVisualServo(const bool enable)
+{
+  std_msgs::Bool bool_msg;
+  bool_msg.data = enable;
+  pub_visual_servo_enable_.publish(bool_msg);
 }
 
 void BebopBehaviorNode::UpdateBehavior()
@@ -65,11 +75,16 @@ void BebopBehaviorNode::UpdateBehavior()
 
   bebop_prev_mode_ = bebop_mode_;
 
+  ROS_DEBUG_THROTTLE(1 , "[BEH] %s", status_publisher_.GetBuffer().str().c_str());
+  status_publisher_.Publish();
+
   // Deactivate all async subs if they are not fresh enough
   sub_joy_.DeactivateIfOlderThan(1.0);
   sub_periodic_tracks_.DeactivateIfOlderThan(1.0);
-  sub_visual_tracker_track_.DeactivateIfOlderThan(1.0);
+  sub_visual_tracker_track_.DeactivateIfOlderThan(5.0);
   sub_bebop_att_.DeactivateIfOlderThan(1.0);
+  // The tolerance on camera_info_sub is lower
+  sub_camera_info_.DeactivateIfOlderThan(0.5);
 
   // Emergency behavior is implemented way down the pipeline, in cmd_vel_mux layer
   // regardless of the current mode, is joy_override_button is pressed, we will pause execution
@@ -79,6 +94,18 @@ void BebopBehaviorNode::UpdateBehavior()
     ROS_WARN("[BEH] Joystick override detected");
     bebop_resume_mode_ = bebop_mode_;
     bebop_mode_ = constants::MODE_MANUAL;
+    return;
+  }
+
+  if ((bebop_mode_ != constants::MODE_MANUAL) &&
+      (bebop_mode_ != constants::MODE_BAD_VIDEO) &&
+      (bebop_mode_ != constants::MODE_IDLE) &&
+      (false == sub_camera_info_.IsActive()))
+  {
+    ROS_ERROR("[BEH] Video feed is stale");
+    bebop_resume_mode_ = bebop_mode_;
+    bebop_mode_ = constants::MODE_BAD_VIDEO;
+    return;
   }
 
   switch (bebop_mode_)
@@ -122,6 +149,32 @@ void BebopBehaviorNode::UpdateBehavior()
     }
     break;
   }
+
+  case constants::MODE_BAD_VIDEO:
+  {
+    if (is_transition)
+    {
+      ROS_ERROR("[BEH] Video STALE mode");
+      ToggleVisualServo(false);
+    }
+
+    if (mode_duration.toSec() > param_stale_video_timeout_)
+    {
+      ROS_WARN_STREAM("[BEH] Time in video stale mode exceeded the `stale_video_timeout` of " << param_stale_video_timeout_);
+      ROS_WARN_STREAM("[BEH] Behavior will be reset after video comes back online");
+      bebop_resume_mode_ = constants::MODE_IDLE;
+      break;
+    }
+
+    if (sub_camera_info_.GetFreshness().toSec() < 0.05)
+    {
+      ROS_WARN_STREAM("[BEH] Video is good again!");
+      bebop_mode_ = bebop_resume_mode_;
+      break;
+    }
+
+    break;
+  }
   case constants::MODE_SEARCHING:
   {
     if (is_transition)
@@ -154,11 +207,11 @@ void BebopBehaviorNode::UpdateBehavior()
     if (is_transition)
     {
       ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
-      std_msgs::Bool bool_msg;
-      bool_msg.data = true;
-      pub_visual_servo_enable_.publish(bool_msg);
+      ToggleVisualServo(true);
     }
 
+    // Visual tracker's inactiviy is either caused by input stream's being stale or
+    // a crash. The former needs a seperate recovery case since this node can also detects it.
     if (!sub_visual_tracker_track_.IsActive())
     {
       ROS_ERROR_STREAM("[BEH] Visual tracker is stale, this should never happen.");
@@ -197,13 +250,22 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
-      ROS_INFO_STREAM("[BEH] Disabling visual servo ...");
-      std_msgs::Bool bool_msg;
-      bool_msg.data = false;
-      pub_visual_servo_enable_.publish(bool_msg);
+      ROS_INFO_STREAM("[BEH] Target lost during approach, waiting for a while ...");
+      ToggleVisualServo(false);
     }
 
-    bebop_mode_ = constants::MODE_IDLE;
+    if (mode_duration.toSec() > 10.0)
+    {
+      ROS_WARN("[BEH] Recovery failed");
+      bebop_mode_ = constants::MODE_IDLE;
+    }
+
+    if (sub_visual_tracker_track_.IsActive() &&
+        sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING)
+    {
+      ROS_INFO("[BEH] Recovery has been succesful");
+      bebop_mode_ = constants::MODE_APPROACHING_PERSON;
+    }
     break;
   }
 
@@ -213,8 +275,6 @@ void BebopBehaviorNode::UpdateBehavior()
   }
   }
 
-  ROS_DEBUG_THROTTLE(1 , "[BEH] %s", status_publisher_.GetBuffer().str().c_str());
-  status_publisher_.Publish();
 }
 
 void BebopBehaviorNode::Spin()
