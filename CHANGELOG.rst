@@ -2,8 +2,8 @@
 Changelog for package bebop_hri
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+1.0.0 (2016-02-11)
+------------------
 * Initial stable version
 * Integerates vel_ctrl, vservo, bebop and teleop
 * Enhanced state machine (wrt to prev versions of this sm)
