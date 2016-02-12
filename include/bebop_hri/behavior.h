@@ -136,7 +136,8 @@ protected:
   constants::bebop_mode_t bebop_mode_prev_;  // prev bebop state
   constants::bebop_mode_t bebop_mode_prev_update_; // bebop state in previous timestep
 
-  constants::bebop_mode_t bebop_resume_mode_;
+  constants::bebop_mode_t bebop_resume_mode_manual_;
+  constants::bebop_mode_t bebop_resume_mode_badvideo_;
 
   ros::Time last_transition_time_;
 

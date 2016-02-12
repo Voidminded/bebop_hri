@@ -21,10 +21,11 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
     status_publisher_(nh_, "status"),
-    bebop_mode_(constants::MODE_IDLE),
-    bebop_mode_prev_(constants::MODE_IDLE),
-    bebop_mode_prev_update_(constants::MODE_IDLE),
-    bebop_resume_mode_(constants::MODE_IDLE),
+    bebop_mode_(constants::MODE_NUM),
+    bebop_mode_prev_(constants::MODE_NUM),
+    bebop_mode_prev_update_(constants::MODE_NUM),
+    bebop_resume_mode_manual_(constants::MODE_IDLE),
+    bebop_resume_mode_badvideo_(constants::MODE_IDLE),
     last_transition_time_(ros::Time::now()),
     led_feedback_(nh_)
 {
@@ -94,7 +95,7 @@ void BebopBehaviorNode::UpdateBehavior()
       sub_joy_.IsActive() && sub_joy_()->buttons.at(param_joy_override_button_))
   {
     ROS_WARN("[BEH] Joystick override detected");
-    bebop_resume_mode_ = bebop_mode_;
+    bebop_resume_mode_manual_ = bebop_mode_;
     Transition(constants::MODE_MANUAL);
     return;
   }
@@ -105,7 +106,7 @@ void BebopBehaviorNode::UpdateBehavior()
       (false == sub_camera_info_.IsActive()))
   {
     ROS_ERROR("[BEH] Video feed is stale");
-    bebop_resume_mode_ = bebop_mode_;
+    bebop_resume_mode_badvideo_ = bebop_mode_;
     Transition(constants::MODE_BAD_VIDEO);
     return;
   }
@@ -143,16 +144,16 @@ void BebopBehaviorNode::UpdateBehavior()
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "red", "yellow", 30);
     }
     if (mode_duration.toSec() > param_joy_override_timeout_ &&
-        bebop_resume_mode_ != constants::MODE_IDLE)
+        bebop_resume_mode_manual_ != constants::MODE_IDLE)
     {
       ROS_WARN_STREAM("[BEH] Time in manual mode exceeded the `joy_override_timeout` of " << param_joy_override_timeout_);
       ROS_WARN_STREAM("[BEH] Behavior will be reset after override is over");
-      bebop_resume_mode_ = constants::MODE_IDLE;
+      bebop_resume_mode_manual_ = constants::MODE_IDLE;
     }
     if (sub_joy_.IsActive() && !sub_joy_()->buttons[param_joy_override_button_])
     {
-      ROS_WARN_STREAM("[BEH] Joystick override ended, going back to " << BEBOP_MODE_STR(bebop_resume_mode_));
-      Transition(bebop_resume_mode_);
+      ROS_WARN_STREAM("[BEH] Joystick override ended, going back to " << BEBOP_MODE_STR(bebop_resume_mode_manual_));
+      Transition(bebop_resume_mode_manual_);
     }
     break;
   }
@@ -166,19 +167,19 @@ void BebopBehaviorNode::UpdateBehavior()
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "red", "magenta", 3.0);
     }
 
-    if (mode_duration.toSec() > param_stale_video_timeout_)
-    {
-      ROS_WARN_STREAM("[BEH] Time in video stale mode exceeded the `stale_video_timeout` of " << param_stale_video_timeout_);
-      ROS_WARN_STREAM("[BEH] Behavior will be reset after video comes back online");
-      bebop_resume_mode_ = constants::MODE_IDLE;
-      break;
-    }
-
     if (sub_camera_info_.GetFreshness().toSec() < 0.05)
     {
       ROS_WARN_STREAM("[BEH] Video is good again!");
-      Transition(bebop_resume_mode_);
+      Transition(bebop_resume_mode_badvideo_);
       break;
+    }
+
+    if ((mode_duration.toSec() > param_stale_video_timeout_) &&
+        (bebop_resume_mode_badvideo_ != constants::MODE_IDLE))
+    {
+      ROS_WARN_STREAM("[BEH] Time in video stale mode exceeded the `stale_video_timeout` of " << param_stale_video_timeout_);
+      ROS_WARN_STREAM("[BEH] Behavior will be reset after video comes back online");
+      bebop_resume_mode_badvideo_ = constants::MODE_IDLE;
     }
 
     break;
