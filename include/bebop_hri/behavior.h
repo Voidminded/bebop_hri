@@ -72,7 +72,7 @@ private:
     c.r = 0.9, c.g = 0.0, c.b = 0.0, colors["red"] = c;
     c.r = 0.0, c.g = 0.0, c.b = 0.9, colors["blue"] = c;
     c.r = 0.0, c.g = 0.9, c.b = 0.9, colors["cyan"] = c;
-    c.r = 0.9, c.g = 0.0, c.b = 0.0, colors["magenta"] = c;
+    c.r = 0.9, c.g = 0.0, c.b = 0.9, colors["magenta"] = c;
     c.r = 0.9, c.g = 0.9, c.b = 0.0, colors["yellow"] = c;
     c.r = 0.9, c.g = 0.9, c.b = 0.9, colors["white"] = c;
   }

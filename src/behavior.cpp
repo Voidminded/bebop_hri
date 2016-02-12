@@ -118,7 +118,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (is_transition)
     {
       Reset();
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "cyan", "magenta", 0.5);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "cyan", "magenta", 0.1);
     }
     if (mode_duration.toSec() > param_idle_timeout_)
     {
@@ -141,7 +141,7 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "red", "yellow", 30);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_BLINK_CLEAR, "red", "yellow", 30);
     }
     if (mode_duration.toSec() > param_joy_override_timeout_ &&
         bebop_resume_mode_manual_ != constants::MODE_IDLE)
@@ -164,7 +164,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_ERROR("[BEH] Video STALE mode");
       ToggleVisualServo(false);
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "red", "magenta", 3.0);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_CONST_3, "red", "magenta", 1.0);
     }
 
     if (sub_camera_info_.GetFreshness().toSec() < 0.05)
@@ -189,7 +189,7 @@ void BebopBehaviorNode::UpdateBehavior()
     if (is_transition)
     {
       ; // TODO: Enable obzerver
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_2, "green", "blue", 3);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
     }
     if (sub_periodic_tracks_.IsActive())
     {
@@ -219,12 +219,12 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
       ToggleVisualServo(true);
     }
-    int new_angle_ = 120.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
+    int new_angle_ = 180.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
                              /sub_camera_info_()->width)-0.5);
-    if( view_angle_ != new_angle_)
+    if( (view_angle_/70) != (new_angle_/70))
     {
       view_angle_ = new_angle_;
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT, "green", "blue", 90, view_angle_);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT, "green", "blue", 90, -1*view_angle_);
     }
     // Visual tracker's inactiviy is either caused by input stream's being stale or
     // a crash. The former needs a seperate recovery case since this node can also detects it.
@@ -276,7 +276,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Target lost during approach, waiting for a while ...");
       ToggleVisualServo(false);
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_2, "cyan", "magenta", 60);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "red", "magenta", 6);
     }
 
     if (mode_duration.toSec() > 10.0)
