@@ -32,7 +32,7 @@ teleop:
     type: topic
     message_type: "geometry_msgs/Twist"
     topic_name: camera_control
-    deadman_buttons: [7]
+    deadman_buttons: [6, 7]
     axis_mappings:
       -
         axis: 5  # Left D-Pad (up/down)
