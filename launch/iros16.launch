@@ -4,6 +4,7 @@
   <arg name="nodelets_output" default="log" />
   <arg name="is_bag" default="false" />
   <arg name="plot_servo" default="false" />
+  <arg name="obz_logfile" default="/tmp/obzerver_ros" />
 
   <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
 
@@ -14,6 +15,14 @@
 
   <include file="$(find bebop_hri)/launch/behavior.launch">
     <arg name="param_file" value="$(find bebop_hri)/config/behavior.yaml" />
+  </include>
+
+  <include file="$(find obzerver_ros)/launch/obzerver.launch">
+    <arg name="input_topic" value="bebop/image_raw" />
+    <arg name="obz_logfile" value="$(arg obz_logfile)" />
+    <arg name="obz_configfile" value="$(find bebop_hri)/config/obz_bebop.ini" />
+    <arg name="param_file" value="$(find bebop_hri)/config/obzerver.yaml" />
+    <arg name="output" value="screen" />
   </include>
 
   <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">

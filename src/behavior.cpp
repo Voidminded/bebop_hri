@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Bool.h>
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
@@ -12,14 +13,18 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
   : nh_(nh),
     priv_nh_(priv_nh),
     sub_joy_(nh_, "joy", 10),
-    sub_periodic_tracks_(nh_, "periodic_tracks", 1),
+    sub_manual_roi_(nh_, "manual_roi", 1),
+    sub_periodic_tracks_(nh_, "obzerver/tracks/periodic", 1),
     sub_visual_tracker_track_(nh_, "visual_tracker_track", 1),
     sub_bebop_att_(nh_, "bebop/states/ARDrone3/PilotingState/AttitudeChanged", 10),
+    sub_bebop_alt_(nh_, "bebop/states/ARDrone3/PilotingState/AltitudeChanged", 10),
     sub_camera_info_(nh_, "bebop/camera_info", 1),
     pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("visual_tracker_reset", 1, true)),
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
+    pub_obzerver_enable_(nh_.advertise<std_msgs::Bool>("obzerver/enable", 1, true)),
+    pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_NUM),
     bebop_mode_prev_(constants::MODE_NUM),
@@ -60,6 +65,21 @@ void BebopBehaviorNode::ToggleVisualServo(const bool enable)
   pub_visual_servo_enable_.publish(bool_msg);
 }
 
+void BebopBehaviorNode::ToggleObzerver(const bool enable)
+{
+  std_msgs::Bool bool_msg;
+  bool_msg.data = enable;
+  pub_obzerver_enable_.publish(bool_msg);
+}
+
+void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &tilt_deg)
+{
+  geometry_msgs::Twist twist;
+  twist.angular.y = tilt_deg;
+  twist.angular.z = pan_deg;
+  pub_bebop_camera_.publish(twist);
+}
+
 void BebopBehaviorNode::UpdateBehavior()
 {
   const bool is_transition = (bebop_mode_ != bebop_mode_prev_update_);
@@ -83,9 +103,11 @@ void BebopBehaviorNode::UpdateBehavior()
 
   // Deactivate all async subs if they are not fresh enough
   sub_joy_.DeactivateIfOlderThan(1.0);
-  sub_periodic_tracks_.DeactivateIfOlderThan(1.0);
+  sub_manual_roi_.DeactivateIfOlderThan(1.0);
+  sub_periodic_tracks_.DeactivateIfOlderThan(0.5);
   sub_visual_tracker_track_.DeactivateIfOlderThan(5.0);
   sub_bebop_att_.DeactivateIfOlderThan(1.0);
+  sub_bebop_alt_.DeactivateIfOlderThan(1.0);
   // The tolerance on camera_info_sub is lower
   sub_camera_info_.DeactivateIfOlderThan(0.5);
 
@@ -188,15 +210,38 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
-      ; // TODO: Enable obzerver
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
+      ToggleObzerver(true);
+      MoveBebopCamera(0.0, -22.5);
     }
-    if (sub_periodic_tracks_.IsActive())
+
+    // The manual ROI has a higher priority than obzerver
+    if (sub_manual_roi_.IsActive())
     {
-      const sensor_msgs::RegionOfInterest& roi = sub_periodic_tracks_.GetMsgCopy();
-      ROS_INFO_STREAM("[BEH] Obzerver found a stationary periodic track [x, y, w, h]: "
-                      << roi.x_offset << " " << roi.y_offset << " " << roi.width << " " << roi.height);
+      const sensor_msgs::RegionOfInterest& roi = sub_manual_roi_.GetMsgCopy();
+      ROS_WARN_STREAM("[BEH]  Manual ROI for initialization [x, y, w, h]: "
+                      << roi.x_offset << " " << roi.y_offset << " "
+                      << roi.width << " " << roi.height);
       pub_cftld_tracker_init_.publish(roi);
+      ToggleObzerver(false);
+    }
+    else if (sub_periodic_tracks_.IsActive() && sub_periodic_tracks_()->tracks.size())
+    {
+      ROS_WARN_STREAM("[BEH] Found " << sub_periodic_tracks_()->tracks.size() << " periodic tracks.");
+
+      const obzerver_ros::Track pt = sub_periodic_tracks_.GetMsgCopy().tracks[0];
+      ROS_WARN_STREAM("[BEH]  Frequency: " << pt.dominant_freq);
+      ROS_WARN_STREAM("[BEH]  Displacement: " << pt.displacement);
+
+      if (pt.displacement < 50.0)
+      {
+        const sensor_msgs::RegionOfInterest& roi = pt.roi;
+        ROS_WARN_STREAM("[BEH]  The track is stationary enough [x, y, w, h]: "
+                        << roi.x_offset << " " << roi.y_offset << " "
+                        << roi.width << " " << roi.height);
+        pub_cftld_tracker_init_.publish(roi);
+        ToggleObzerver(false);
+      }
     }
 
     // TODO: Add confidence
@@ -207,6 +252,7 @@ void BebopBehaviorNode::UpdateBehavior()
       const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
       ROS_INFO_STREAM("[BEH] Visual tracker has been initialized. Approaching her ... id: "
                       <<  t.uid << " confidence: " << t.confidence);
+      ToggleObzerver(false);
       Transition(constants::MODE_APPROACHING_PERSON);
     }
     break;
@@ -218,15 +264,8 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
       ToggleVisualServo(true);
-      view_angle_ = 360;
     }
-    int new_angle_ = 180.0*(((double(sub_visual_tracker_track_()->roi.width/2.0)+sub_visual_tracker_track_()->roi.x_offset)
-                             /sub_camera_info_()->width)-0.5);
-    if( (view_angle_/70) != (new_angle_/70))
-    {
-      view_angle_ = new_angle_;
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT, "green", "blue", 90, -1*view_angle_);
-    }
+
     // Visual tracker's inactiviy is either caused by input stream's being stale or
     // a crash. The former needs a seperate recovery case since this node can also detects it.
     if (!sub_visual_tracker_track_.IsActive())
@@ -238,7 +277,16 @@ void BebopBehaviorNode::UpdateBehavior()
       break;
     }
 
+
     const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
+
+    ROS_ASSERT(sub_camera_info_()->width != 0);
+    const int view_angle_ = -180.0 * (((double(t.roi.width / 2.0)+ t.roi.x_offset)
+                                      / sub_camera_info_()->width) - 0.5);
+
+    led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+                               "green", "blue", 90, view_angle_);
+
 
     // TODO: Add confidence
     if (t.status != cftld_ros::Track::STATUS_TRACKING)
@@ -266,6 +314,16 @@ void BebopBehaviorNode::UpdateBehavior()
       // ignores it all other time
       msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
       pub_visual_servo_target_.publish(msg_vservo_target_);
+
+
+      // Experimental
+      if (sub_bebop_att_.IsActive())
+      {
+        const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
+        const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.5 - alt_target);
+        MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * 22.5);
+      }
+      // END
     }
 
     break;
@@ -307,6 +365,7 @@ void BebopBehaviorNode::Spin()
 {
   ros::Rate loop_rate(param_update_rate_);
 
+  MoveBebopCamera(0.0, 0.0);
   while (ros::ok())
   {
     try

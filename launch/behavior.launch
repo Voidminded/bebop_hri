@@ -3,7 +3,7 @@
   <arg name="param_file" default="$(find bebop_hri)/config/behavior.yaml" />
   <node name="behavior_node" type="behavior_node" pkg="bebop_hri" output="screen">
     <remap from="status" to="behavior/status" />
-    <remap from="periodic_tracks" to="rqt_image_view/clicked_roi" />
+    <remap from="manual_roi" to="rqt_image_view/clicked_roi" />
     <remap from="visual_tracker_track" to="cftld/track" />
     <remap from="visual_tracker_reset" to="cftld/reset" />
     <remap from="visual_tracker_init" to="cftld/init_roi" />

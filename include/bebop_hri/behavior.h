@@ -15,9 +15,16 @@
 #include "cftld_ros/Track.h"
 #include "bebop_vservo/Target.h"
 #include "bebop_msgs/Ardrone3PilotingStateAttitudeChanged.h"
+#include "bebop_msgs/Ardrone3PilotingStateAltitudeChanged.h"
+#include "obzerver_ros/Tracks.h"
+#include "geometry_msgs/Twist.h"
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
+
+#ifndef CLAMP
+#define CLAMP(x, l, h) (((x) > (h)) ? (h) : (((x) < (l)) ? (l) : (x)))
+#endif
 
 namespace bebop_hri
 {
@@ -108,9 +115,11 @@ protected:
   ros::NodeHandle priv_nh_;
 
   behavior_tools::ASyncSub<sensor_msgs::Joy> sub_joy_;
-  behavior_tools::ASyncSub<sensor_msgs::RegionOfInterest> sub_periodic_tracks_;
+  behavior_tools::ASyncSub<sensor_msgs::RegionOfInterest> sub_manual_roi_;
+  behavior_tools::ASyncSub<obzerver_ros::Tracks> sub_periodic_tracks_;
   behavior_tools::ASyncSub<cftld_ros::Track> sub_visual_tracker_track_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAttitudeChanged> sub_bebop_att_;
+  behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAltitudeChanged> sub_bebop_alt_;
   behavior_tools::ASyncSub<sensor_msgs::CameraInfo> sub_camera_info_;
 
   // To reset/initialize the visualal tracker
@@ -123,6 +132,9 @@ protected:
 
   // To enable/disable obzerver
   ros::Publisher pub_obzerver_enable_;
+
+  // To move the camera
+  ros::Publisher pub_bebop_camera_;
 
   util::StringPublisher status_publisher_;
 
@@ -143,7 +155,6 @@ protected:
 
   // Feedback generator and variables
   feedback::FeedbackGenerator led_feedback_;
-  int view_angle_;
 
   // params
   double param_update_rate_;
@@ -157,6 +168,8 @@ protected:
   double param_stale_video_timeout_;
 
   void ToggleVisualServo(const bool enable);
+  void ToggleObzerver(const bool enable);
+  void MoveBebopCamera(const double& pan_deg, const double& tilt_deg);
 
   void Reset();
   void UpdateParams();

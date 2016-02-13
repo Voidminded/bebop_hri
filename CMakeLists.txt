@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   cftld_ros
   bebop_vel_ctrl
   bebop_vservo
+  obzerver_ros
   autonomy_leds_msgs
 )
 
