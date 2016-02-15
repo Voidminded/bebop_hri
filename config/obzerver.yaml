@@ -1,6 +1,6 @@
 start_paused: true
-enable_debug_image: false
-enable_diff_image: false
+enable_debug_image: true
+enable_diff_image: true
 enable_simmat_image: false
 enable_stablized_image: true
 downsample_factor: 1.0

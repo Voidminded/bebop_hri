@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="is_bag" default="false" />
+  <arg name="compressed" default="false" />
+  <arg name="obz_logfile" default="/tmp/obzerver_ros" />
+
+  <group unless="$(arg is_bag)">
+    <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
+
+    <include file="$(find bebop_tools)/launch/joy_teleop.launch">
+      <arg name="joy_dev" value="$(arg joy_dev)" />
+      <arg name="teleop_config" value="$(find bebop_hri)/config/log710.yaml" />
+    </include>
+    <node pkg="twist_mux" type="twist_mux" name="twist_mux" output="screen">
+    <remap from="cmd_vel_out" to="/bebop/cmd_vel" />
+    <rosparam file="$(find bebop_hri)/config/twist_mux.yaml" command="load"/>
+    <rosparam file="$(find bebop_hri)/config/twist_mux_locks.yaml" command="load"/>
+    <node ns="bebop" pkg="bebop_driver" name="bebop_driver" type="bebop_driver_node" output="$(arg nodelets_output)">
+      <param name="camera_info_url" value="package://bebop_driver/data/bebop_camera_calib.yaml" />
+      <param name="bebop_ip" value="192.168.42.1" />
+      <rosparam command="load" file="$(find bebop_driver)/config/defaults.yaml" />
+    </node>
+   </node>
+
+</group>
+
+  <group if="$(arg compressed)">
+    <!-- republisher -->
+    <node name="republish" pkg="image_transport" type="republish" args="compressed in:=bebop/image_raw raw out:=bebop/image_raw" output="screen" />
+  </group>
+
+  <include file="$(find obzerver_ros)/launch/obzerver.launch" >
+    <arg name="input_topic" value="bebop/image_raw" />
+    <arg name="obz_logfile" value="$(arg obz_logfile)" />
+    <arg name="obz_configfile" value="$(find bebop_hri)/config/obz_bebop.ini" />
+    <arg name="param_file" value="$(find bebop_hri)/config/obzerver.yaml" />
+    <arg name="start_paused" value="false" />
+    <arg name="output" value="screen" />
+  </include>
+
+  <node name="rqt_obzerver" type="rqt_gui" pkg="rqt_gui" args="--clear-config -m -f -l --perspective-file $(find bebop_hri)/rqt/obzerver.perspective" output="log" />
+</launch>
