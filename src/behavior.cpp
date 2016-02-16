@@ -228,9 +228,9 @@ void BebopBehaviorNode::UpdateBehavior()
       for (uint32_t i = 0; i < all_tracks.tracks.size(); ++i)
       {
         const obzerver_ros::Track& track = all_tracks.tracks[i];
-        if ((track.displacement < 50.0) &&
-            (track.status == obzerver_ros::Track::STATUS_TRACKING) &&
-            (track.dominant_freq > 0.0))
+        if ((track.displacement < 20.0) &&
+            (track.status == obzerver_ros::Track::STATUS_TRACKING)
+            /* && (track.dominant_freq > 0.0)*/)
         {
           current_promising_tracks++;
         }

@@ -1,11 +1,47 @@
-- git: {local-name: ar_track_alvar, uri: 'https://github.com/AutonomyLab/ar_track_alvar.git', version: 'roi-hack'}
-- git: {local-name: bebop_autonomy, uri: 'https://github.com/AutonomyLab/bebop_autonomy.git', version: indigo-devel}
-- git: {local-name: bebop_hri, uri: 'https://bitbucket.org/AutonomyLab/bebop_hri.git', version: master}
-- git: {local-name: bebop_vel_ctrl, uri: 'https://bitbucket.org/AutonomyLab/bebop_vel_ctrl.git', version: master}
-- git: { local-name: bebop_vservo, uri: 'https://bitbucket.org/AutonomyLab/bebop_vservo.git', version: master}
-- git: {local-name: cftld_ros, uri: 'https://bitbucket.org/AutonomyLab/cftld_ros.git', version: master}
-- git: {local-name: rqt_common_plugins, uri: 'https://github.com/Voidminded/rqt_common_plugins.git', version: master}
-- git: {local-name: cv_bridge, uri: 'https://github.com/AutonomyLab/vision_opencv', version: indigo}
-- git: {local-name: autonomy_leds, uri: 'https://github.com/AutonomyLab/autonomy_leds', version: dev}
-- git: {local-name: obzerver_ros, uri: 'https://bitbucket.org/AutonomyLab/obzerver_ros.git', version: master}
-- git: {local-name: image_transport_plugins, uri: 'https://github.com/AutonomyLab/image_transport_plugins', version: indigo-devel}
+- git:
+    local-name: ar_track_alvar
+    uri: https://github.com/AutonomyLab/ar_track_alvar.git
+    version: roi-hack
+- git:
+    local-name: autonomy_hri
+    uri: https://github.com/AutonomyLab/autonomy_hri
+- git:
+    local-name: autonomy_leds
+    uri: https://github.com/AutonomyLab/autonomy_leds
+    version: dev
+- git:
+    local-name: bebop_autonomy
+    uri: https://github.com/AutonomyLab/bebop_autonomy.git
+    version: indigo-devel
+- git:
+    local-name: bebop_hri
+    uri: https://bitbucket.org/AutonomyLab/bebop_hri.git
+    version: master
+- git:
+    local-name: bebop_vel_ctrl
+    uri: https://bitbucket.org/AutonomyLab/bebop_vel_ctrl.git
+    version: master
+- git:
+    local-name: bebop_vservo
+    uri: https://bitbucket.org/AutonomyLab/bebop_vservo.git
+    version: master
+- git:
+    local-name: cftld_ros
+    uri: https://bitbucket.org/AutonomyLab/cftld_ros.git
+    version: master
+- git:
+    local-name: cv_bridge
+    uri: https://github.com/AutonomyLab/vision_opencv
+    version: indigo
+- git:
+    local-name: image_transport_plugins
+    uri: https://github.com/AutonomyLab/image_transport_plugins.git
+    version: indigo-devel
+- git:
+    local-name: obzerver_ros
+    uri: https://bitbucket.org/AutonomyLab/obzerver_ros.git
+    version: master
+- git:
+    local-name: rqt_common_plugins
+    uri: https://github.com/Voidminded/rqt_common_plugins.git
+    version: master

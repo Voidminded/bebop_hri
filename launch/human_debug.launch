@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" ?>
 <launch>
   <arg name="is_bag" default="false" />
   <arg name="compressed" default="false" />
@@ -29,14 +29,13 @@
     <node name="republish" pkg="image_transport" type="republish" args="compressed in:=bebop/image_raw raw out:=bebop/image_raw" output="screen" />
   </group>
 
-  <include file="$(find obzerver_ros)/launch/obzerver.launch" >
+  <include file="$(find autonomy_human)/launch/autonomy_human.launch">
+    <arg name="param_file" value="$(find bebop_hri)/config/autonomy_human.yaml" />
     <arg name="input_topic" value="bebop/image_raw" />
-    <arg name="obz_logfile" value="$(arg obz_logfile)" />
-    <arg name="obz_configfile" value="$(find bebop_hri)/config/obz_bebop.ini" />
-    <arg name="param_file" value="$(find bebop_hri)/config/obzerver.yaml" />
-    <arg name="start_paused" value="false" />
     <arg name="output" value="screen" />
+    <arg name="debug_mode" value="18" />
   </include>
 
-  <node name="rqt_obzerver" type="rqt_gui" pkg="rqt_gui" args="--clear-config -f -l --perspective-file $(find bebop_hri)/rqt/obzerver.perspective" output="log" />
+  <node name="rqt_human" type="rqt_gui" pkg="rqt_gui" args="--clear-config -f -l --perspective-file $(find bebop_hri)/rqt/human.perspective" output="log" />
+
 </launch>
