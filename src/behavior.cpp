@@ -14,7 +14,8 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     priv_nh_(priv_nh),
     sub_joy_(nh_, "joy", 10),
     sub_manual_roi_(nh_, "manual_roi", 1),
-    sub_periodic_tracks_(nh_, "obzerver/tracks/periodic", 1),
+    sub_periodic_tracks_(nh_, "obzerver/tracks/periodic", 10),
+    sub_all_tracks_(nh_, "obzerver/tracks/all", 10),
     sub_visual_tracker_track_(nh_, "visual_tracker_track", 1),
     sub_bebop_att_(nh_, "bebop/states/ARDrone3/PilotingState/AttitudeChanged", 10),
     sub_bebop_alt_(nh_, "bebop/states/ARDrone3/PilotingState/AltitudeChanged", 10),
@@ -32,6 +33,7 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     bebop_resume_mode_manual_(constants::MODE_IDLE),
     bebop_resume_mode_badvideo_(constants::MODE_IDLE),
     last_transition_time_(ros::Time::now()),
+    promising_tracks(0),
     led_feedback_(nh_)
 {
   UpdateParams();
@@ -105,6 +107,7 @@ void BebopBehaviorNode::UpdateBehavior()
   sub_joy_.DeactivateIfOlderThan(1.0);
   sub_manual_roi_.DeactivateIfOlderThan(1.0);
   sub_periodic_tracks_.DeactivateIfOlderThan(0.5);
+  sub_all_tracks_.DeactivateIfOlderThan(0.5);
   sub_visual_tracker_track_.DeactivateIfOlderThan(5.0);
   sub_bebop_att_.DeactivateIfOlderThan(1.0);
   sub_bebop_alt_.DeactivateIfOlderThan(1.0);
@@ -215,6 +218,36 @@ void BebopBehaviorNode::UpdateBehavior()
       MoveBebopCamera(0.0, -22.5);
     }
 
+    // User Feedback
+
+    if (sub_all_tracks_.IsActive() && sub_all_tracks_()->tracks.size())
+    {
+      const obzerver_ros::Tracks& all_tracks = sub_all_tracks_.GetMsgCopy();
+      uint32_t current_promising_tracks = 0;
+
+      for (uint32_t i = 0; i < all_tracks.tracks.size(); ++i)
+      {
+        const obzerver_ros::Track& track = all_tracks.tracks[i];
+        if ((track.displacement < 50.0) &&
+            (track.status == obzerver_ros::Track::STATUS_TRACKING) &&
+            (track.dominant_freq > 0.0))
+        {
+          current_promising_tracks++;
+        }
+      }
+
+      if ((current_promising_tracks > 0) && (promising_tracks == 0))
+      {
+        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "blue", "white", 5.0);
+      }
+
+      if ((current_promising_tracks == 0) && (promising_tracks >0))
+      {
+        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
+      }
+
+      promising_tracks = current_promising_tracks;
+    }
     // The manual ROI has a higher priority than obzerver
     if (sub_manual_roi_.IsActive())
     {
@@ -230,15 +263,25 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_WARN_STREAM("[BEH] Found " << sub_periodic_tracks_()->tracks.size() << " periodic tracks.");
 
       const obzerver_ros::Track pt = sub_periodic_tracks_.GetMsgCopy().tracks[0];
+      const int32_t img_w = sub_periodic_tracks_()->max_width;
+      const int32_t img_h = sub_periodic_tracks_()->max_height;
       ROS_WARN_STREAM("[BEH]  Frequency: " << pt.dominant_freq);
       ROS_WARN_STREAM("[BEH]  Displacement: " << pt.displacement);
 
-      if (pt.displacement < 50.0)
+      // TODO: param me
+      if (pt.displacement < 30.0)
       {
-        const sensor_msgs::RegionOfInterest& roi = pt.roi;
-        ROS_WARN_STREAM("[BEH]  The track is stationary enough [x, y, w, h]: "
-                        << roi.x_offset << " " << roi.y_offset << " "
-                        << roi.width << " " << roi.height);
+        sensor_msgs::RegionOfInterest roi = pt.roi;
+        int32_t roi_wh = std::max(pt.roi.width, pt.roi.height);
+        if (roi.width + roi_wh > img_w) roi_wh = img_w - roi.x_offset - 1;
+        if (roi.height + roi_wh > img_h) roi_wh = img_h - roi.y_offset - 1;
+        roi.width = roi_wh;
+        roi.height = roi_wh;
+
+        ROS_WARN_STREAM("[BEH] The track is stationary enough [x, y, w, h]: "
+                        << roi.x_offset << " , " << roi.y_offset << " , "
+                        << roi.width << " , " << roi.height);
+
         pub_cftld_tracker_init_.publish(roi);
         ToggleObzerver(false);
       }

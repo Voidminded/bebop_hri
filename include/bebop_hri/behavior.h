@@ -117,6 +117,8 @@ protected:
   behavior_tools::ASyncSub<sensor_msgs::Joy> sub_joy_;
   behavior_tools::ASyncSub<sensor_msgs::RegionOfInterest> sub_manual_roi_;
   behavior_tools::ASyncSub<obzerver_ros::Tracks> sub_periodic_tracks_;
+  behavior_tools::ASyncSub<obzerver_ros::Tracks> sub_all_tracks_;
+
   behavior_tools::ASyncSub<cftld_ros::Track> sub_visual_tracker_track_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAttitudeChanged> sub_bebop_att_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAltitudeChanged> sub_bebop_alt_;
@@ -152,6 +154,7 @@ protected:
   constants::bebop_mode_t bebop_resume_mode_badvideo_;
 
   ros::Time last_transition_time_;
+  uint32_t promising_tracks;
 
   // Feedback generator and variables
   feedback::FeedbackGenerator led_feedback_;

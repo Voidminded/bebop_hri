@@ -39,6 +39,7 @@
   <run_depend>bebop_driver</run_depend>
   <run_depend>bebop_tools</run_depend>
   <run_depend>obzerver_ros</run_depend>
+  <run_depend>topic_tools</run_depend>
 
   <export>
   </export>

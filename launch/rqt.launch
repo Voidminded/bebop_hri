@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="rqt_bebop" type="rqt_gui" pkg="rqt_gui" args="--clear-config -f -l --perspective-file $(find bebop_hri)/rqt/iros16.perspective" output="log" />
+</launch>
