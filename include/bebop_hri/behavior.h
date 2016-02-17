@@ -57,7 +57,18 @@ const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
   "Manual (Joy Override)", "Stale Video", "NAN"
 };
 
+enum gesture_states_t {
+  GESTURE_NONE = 0,
+  GESTURE_LEFT_SWING,
+  GESTURE_RIGHT_SWING,
+  GESTURE_BOTH_SWING,
+  GESTURE_NUM
+};
+
+const std::string STR_GESTURE_STATES_MAP[GESTURE_NUM + 1] = {"None", "Left", "Right", "Both", "NAN"};
+
 #define BEBOP_MODE_STR(x) (::bebop_hri::constants::STR_BEBOP_MODE_MAP[x])
+#define GESTURE_STR(x) (::bebop_hri::constants::STR_GESTURE_STATES_MAP[x])
 
 }  // namespace constants
 
@@ -143,6 +154,7 @@ protected:
 
   // To move the camera
   ros::Publisher pub_bebop_camera_;
+  ros::Publisher pub_bebop_flip_;
 
   util::StringPublisher status_publisher_;
 
@@ -165,22 +177,42 @@ protected:
   // Feedback generator and variables
   feedback::FeedbackGenerator led_feedback_;
 
+  // Gesture & Flow
+
+  // Gesture & Flow
+  std::deque<double> flow_left_vec_;
+  std::deque<double> flow_right_vec_;
+  constants::gesture_states_t gesture_curr_;
+  constants::gesture_states_t gesture_prev_;
+  double flow_left_median_;
+  double flow_right_median_;
+  uint32_t gest_left_counter_;
+  uint32_t gest_right_counter_;
+  uint32_t gesture_both_counter_;
+  bool GestureUpdate();
+
   // params
   double param_update_rate_;
   int32_t param_init_mode_;
   int32_t param_joy_override_button_;
+  int32_t param_joy_reset_button_;
   double param_idle_timeout_;
   double param_joy_override_timeout_;
   double param_target_height_;
   double param_target_dist_ground_;
   double param_servo_desired_depth_;
   double param_stale_video_timeout_;
+  int32_t param_flow_queue_size_;
+  bool param_enable_camera_control_;
+  double param_max_camera_tilt_deg_;
 
   void ToggleVisualServo(const bool enable);
   void ToggleObzerver(const bool enable);
   void ToggleAutonomyHuman(const bool enable);
 
   void MoveBebopCamera(const double& pan_deg, const double& tilt_deg);
+  void BebopFlip(const uint8_t flip_type);
+  void ControlBebopCamera();
 
   void Reset();
   void UpdateParams();

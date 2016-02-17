@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <string>
 #include <sensor_msgs/RegionOfInterest.h>
+#include <deque>
 
 namespace bebop_hri
 {
@@ -83,6 +84,15 @@ float GetROIOverlap(const sensor_msgs::RegionOfInterest& r1, const sensor_msgs::
   assert(overlap >= 0.0f & overlap <= 1.0f);
 
   return overlap;
+}
+
+template<class T>
+T median(const std::deque<T> &deq)
+{
+    std::deque<T> v = deq;
+    std::size_t n = v.size() / 2;
+    std::nth_element(v.begin(), v.begin()+n, v.end());
+    return v[n];
 }
 
 }  // namespace util

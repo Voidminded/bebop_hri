@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
+#include <std_msgs/UInt8.h>
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
@@ -28,6 +29,7 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_obzerver_enable_(nh_.advertise<std_msgs::Bool>("obzerver/enable", 1, true)),
     pub_human_enable_(nh_.advertise<std_msgs::Bool>("human/enable", 1, true)),
     pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
+    pub_bebop_flip_(nh_.advertise<std_msgs::UInt8>("bebop/flip", 1, false)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_NUM),
     bebop_mode_prev_(constants::MODE_NUM),
@@ -36,7 +38,14 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     bebop_resume_mode_badvideo_(constants::MODE_IDLE),
     last_transition_time_(ros::Time::now()),
     promising_tracks(0),
-    led_feedback_(nh_)
+    led_feedback_(nh_),
+    gesture_curr_(constants::GESTURE_NONE),
+    gesture_prev_(constants::GESTURE_NONE),
+    flow_left_median_(0.0),
+    flow_right_median_(0.0),
+    gest_left_counter_(0.0),
+    gest_right_counter_(0.0),
+    gesture_both_counter_(0.0)
 {
   UpdateParams();
   Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
@@ -48,11 +57,15 @@ void BebopBehaviorNode::UpdateParams()
   util::get_param(priv_nh_, "initial_mode", param_init_mode_, 0);
   util::get_param(priv_nh_, "joy_override_buttion", param_joy_override_button_, 7);
   util::get_param(priv_nh_, "joy_override_timeout", param_joy_override_timeout_, 20.0);
+  util::get_param(priv_nh_, "joy_reset_button", param_joy_reset_button_, 6);
   util::get_param(priv_nh_, "idle_timeout", param_idle_timeout_, 10.0);
   util::get_param(priv_nh_, "servo_desired_depth", param_servo_desired_depth_, 2.5);
   util::get_param(priv_nh_, "target_height", param_target_height_, 0.5);
   util::get_param(priv_nh_, "target_dist_ground", param_target_dist_ground_, 0.75);
   util::get_param(priv_nh_, "stale_video_timeout", param_stale_video_timeout_, 10.0);
+  util::get_param(priv_nh_, "flow_queue_size", param_flow_queue_size_, 19);
+  util::get_param(priv_nh_, "enable_camera_control", param_enable_camera_control_, true);
+  util::get_param(priv_nh_, "max_camera_tilt", param_max_camera_tilt_deg_, 22.5);
 }
 
 void BebopBehaviorNode::Reset()
@@ -62,6 +75,16 @@ void BebopBehaviorNode::Reset()
   ToggleVisualServo(false);
   ToggleObzerver(false);
   ToggleAutonomyHuman(false);
+
+  flow_left_vec_.clear();
+  flow_right_vec_.clear();
+  gesture_curr_ = constants::GESTURE_NONE;
+  gesture_prev_ = constants::GESTURE_NONE;
+  flow_left_median_ = 0.0;
+  flow_right_median_ = 0.0;
+  gest_left_counter_ = 0;
+  gest_right_counter_ = 0;
+  gesture_both_counter_ = 0;
 }
 
 void BebopBehaviorNode::ToggleVisualServo(const bool enable)
@@ -87,11 +110,74 @@ void BebopBehaviorNode::ToggleAutonomyHuman(const bool enable)
 
 void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &tilt_deg)
 {
+  if (!param_enable_camera_control_)
+  {
+    ROS_ERROR_ONCE("[BEH] Camera control is disabled");
+    return;
+  }
+
   ROS_DEBUG_STREAM("[BEH] Request to move Bebop's camera to " << tilt_deg);
   geometry_msgs::Twist twist;
   twist.angular.y = tilt_deg;
   twist.angular.z = pan_deg;
   pub_bebop_camera_.publish(twist);
+}
+
+void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
+{
+  ROS_WARN_STREAM("[BEH] Flip requested: " << flip_type);
+  std_msgs::UInt8 ft_msg;
+  // TODO: bound check
+  ft_msg.data = flip_type;
+  pub_bebop_flip_.publish(ft_msg);
+}
+
+void BebopBehaviorNode::ControlBebopCamera()
+{
+  if (sub_bebop_att_.IsActive())
+  {
+    const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
+    const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.75 - alt_target);
+    ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
+                             << " alt_bebop: " << sub_bebop_alt_()->altitude
+                             << " tilt_rel: " << tilt);
+    MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * param_max_camera_tilt_deg_);
+  }
+}
+
+bool BebopBehaviorNode::GestureUpdate()
+{
+    ROS_ASSERT(flow_left_vec_.size() == flow_right_vec_.size());
+    // TODO: Config
+    if (flow_left_vec_.size() < param_flow_queue_size_) // Not ready yet
+        return false;
+
+    flow_left_median_ = util::median<double>(flow_left_vec_);
+    flow_right_median_ = util::median<double>(flow_right_vec_);
+
+    // TODO: config
+    // gesture_filter_zero: 0.1
+    // gesture_filter_threshold: 3.2
+    bool left = ( flow_left_median_ > 5.0) && ( flow_right_median_ < 0.1 );
+    bool right = ( flow_right_median_ > 5.0) && ( flow_left_median_ <  0.1 );
+    bool both = ( flow_left_median_ > 5.0) && ( flow_right_median_ > 5.0);
+
+    gest_left_counter_ = left ? gest_left_counter_+1 : 0;
+    gest_right_counter_ = right ? gest_right_counter_+1 : 0;
+    gesture_both_counter_ = both ? gesture_both_counter_+1 :  0;
+
+    // TODO: Config
+    // gesture_sync_window: 4
+    gesture_prev_ = gesture_curr_;
+    gesture_curr_ = constants::GESTURE_NONE;
+    if ((gest_left_counter_ > 10) && (gest_right_counter_ == 0)) gesture_curr_ = constants::GESTURE_LEFT_SWING;
+    if ((gest_right_counter_ > 10) && (gest_left_counter_ == 0)) gesture_curr_ = constants::GESTURE_RIGHT_SWING;
+    // High Priority
+    if (gesture_both_counter_ > 10) gesture_curr_ = constants::GESTURE_BOTH_SWING;
+
+    ROS_INFO_THROTTLE(0.25, "[BEH] Left: (%.3f, %2d) Right: (%.3f, %2d) Both: (%2d) G: %d ",
+             flow_left_median_, (int) gest_left_counter_,  flow_right_median_, (int) gest_right_counter_, (int) gesture_both_counter_, gesture_curr_ );
+    return true;
 }
 
 void BebopBehaviorNode::UpdateBehavior()
@@ -130,7 +216,9 @@ void BebopBehaviorNode::UpdateBehavior()
   // Emergency behavior is implemented way down the pipeline, in cmd_vel_mux layer
   // regardless of the current mode, is joy_override_button is pressed, we will pause execution
   if ((bebop_mode_ != constants::MODE_MANUAL) &&
-      sub_joy_.IsActive() && sub_joy_()->buttons.at(param_joy_override_button_))
+      sub_joy_.IsActive() &&
+      sub_joy_()->buttons.at(param_joy_override_button_) &&
+      !sub_joy_()->buttons.at(param_joy_reset_button_))
   {
     ROS_WARN("[BEH] Joystick override detected");
     bebop_resume_mode_manual_ = bebop_mode_;
@@ -158,7 +246,12 @@ void BebopBehaviorNode::UpdateBehavior()
       Reset();
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "green", "cyan", 0.6);
     }
-    if (mode_duration.toSec() > param_idle_timeout_)
+    const bool manual_reset = (mode_duration.toSec() > 1.0) &&
+        sub_joy_.IsActive() &&
+        !sub_joy_()->buttons[param_joy_override_button_] &&
+        sub_joy_()->buttons[param_joy_reset_button_];
+
+    if ((mode_duration.toSec() > param_idle_timeout_) || (manual_reset))
     {
       Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
 
@@ -169,8 +262,8 @@ void BebopBehaviorNode::UpdateBehavior()
         Transition(constants::MODE_SEARCHING);
       }
 
-      ROS_INFO_STREAM("[BEH] Idle timeout, transitioning to initial state: " <<
-                      BEBOP_MODE_STR(bebop_mode_));
+      ROS_INFO_STREAM("[BEH] IDLE transition because of " << (manual_reset ? "Manual Reset" : "Timeout"));
+      ROS_INFO_STREAM("[BEH] transitioning to initial state: " << BEBOP_MODE_STR(bebop_mode_));
     }
     break;
   }
@@ -188,6 +281,18 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_WARN_STREAM("[BEH] Behavior will be reset after override is over");
       bebop_resume_mode_manual_ = constants::MODE_IDLE;
     }
+
+    // In manual mode, pressing the reset button (while holding the override button),
+    // will immediately reset to IDLE mode
+    if (sub_joy_.IsActive() &&
+        sub_joy_()->buttons[param_joy_override_button_] &&
+        sub_joy_()->buttons[param_joy_reset_button_])
+    {
+      ROS_WARN_STREAM("[BEH] Manual joy reset requested");
+      Transition(constants::MODE_IDLE);
+      break;
+    }
+
     if (sub_joy_.IsActive() && !sub_joy_()->buttons[param_joy_override_button_])
     {
       ROS_WARN_STREAM("[BEH] Joystick override ended, going back to " << BEBOP_MODE_STR(bebop_resume_mode_manual_));
@@ -228,7 +333,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
       ToggleObzerver(true);
-      MoveBebopCamera(0.0, -22.5);
+      MoveBebopCamera(0.0, -param_max_camera_tilt_deg_);
     }
 
     // User Feedback
@@ -374,18 +479,7 @@ void BebopBehaviorNode::UpdateBehavior()
       msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
       pub_visual_servo_target_.publish(msg_vservo_target_);
 
-
-      // Experimental
-      if (sub_bebop_att_.IsActive())
-      {
-        const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
-        const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.5 - alt_target);
-        ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
-                                 << " alt_bebop: " << sub_bebop_alt_()->altitude
-                                 << " tilt_rel: " << tilt);
-        MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * 22.5);
-      }
-      // END
+      if (param_enable_camera_control_) ControlBebopCamera();
 
       if (sub_human_.IsActive() && (sub_human_()->status == autonomy_human::human::STATUS_TRACKING))
       {
@@ -439,6 +533,8 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Close range interaction ...");
       ToggleVisualServo(true);
+      flow_left_vec_.clear();
+      flow_right_vec_.clear();
     }
 
     // Human tracker's inactiviy is either caused by input stream's being stale or
@@ -461,15 +557,6 @@ void BebopBehaviorNode::UpdateBehavior()
     }
     else
     {
-      // Feedback
-      ROS_ASSERT(sub_camera_info_()->width != 0);
-      const int view_angle_ = -180.0 * (((double(h.faceROI.width / 2.0)+ h.faceROI.x_offset)
-                                        / sub_camera_info_()->width) - 0.5);
-
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
-                                 "white", "green", 90, view_angle_);
-
-
       msg_vservo_target_.header.stamp = ros::Time::now();
 
       // re-initialize the servo, only when in mode transition and not from a previous override mode
@@ -480,8 +567,8 @@ void BebopBehaviorNode::UpdateBehavior()
                                    (bebop_mode_prev_ != constants::MODE_CLOSERANGE_LOST)
                                    );
 
-      msg_vservo_target_.desired_depth = param_servo_desired_depth_ + 1.0;
-      msg_vservo_target_.target_distance_ground = 1.2; //param_target_dist_ground_;
+      msg_vservo_target_.desired_depth = param_servo_desired_depth_;
+      msg_vservo_target_.target_distance_ground = param_target_dist_ground_;
 
       //https://upload.wikimedia.org/wikipedia/commons/6/61/HeadAnthropometry.JPG
       //msg_vservo_target_.target_height_m = 0.3;
@@ -494,21 +581,56 @@ void BebopBehaviorNode::UpdateBehavior()
       // ignores it all other time
       msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
 
-      ROS_INFO_STREAM("[BEH] CLOSE RANGE SERVO: " <<
+      ROS_DEBUG_STREAM_THROTTLE(0.5, "[BEH] CLOSE RANGE SERVO: " <<
                h.faceROI.x_offset << " " << h.faceROI.y_offset << " " << h.faceROI.width << " " << h.faceROI.height);
       pub_visual_servo_target_.publish(msg_vservo_target_);
 
-      // Experimental
-      if (sub_bebop_att_.IsActive())
+
+      if (param_enable_camera_control_) ControlBebopCamera();
+
+      // Gesture && Feedback
+      flow_left_vec_.push_front(h.flowScore[0]);
+      flow_right_vec_.push_front(h.flowScore[1]);
+      if (flow_left_vec_.size() > param_flow_queue_size_) flow_left_vec_.pop_back();
+      if (flow_right_vec_.size() > param_flow_queue_size_) flow_right_vec_.pop_back();
+
+      ROS_ASSERT(sub_camera_info_()->width != 0);
+      const int view_angle_ = -180.0 * (((double(h.faceROI.width / 2.0)+ h.faceROI.x_offset)
+                                        / sub_camera_info_()->width) - 0.5);
+      bool gesture_feedback = false;
+      if (GestureUpdate() && gesture_curr_ != constants::GESTURE_NONE)
       {
-        const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
-        const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.5 - alt_target);
-        ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
-                                 << " alt_bebop: " << sub_bebop_alt_()->altitude
-                                 << " tilt_rel: " << tilt);
-        MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * 22.5);
+        ROS_ERROR_STREAM("[BEH Gesture Detected: " << GESTURE_STR(gesture_curr_));
+        if (gesture_curr_ = constants::GESTURE_RIGHT_SWING)
+        {
+          BebopFlip(1);
+          Transition(constants::MODE_IDLE);
+        }
       }
-      // END
+      else
+      {
+        if (flow_left_median_ > 1.0 && flow_left_median_ > flow_right_median_)
+        {
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+                                     "white", "blue", flow_left_median_ * 90, view_angle_);
+          gesture_feedback = true;
+        }
+
+        if (flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_)
+        {
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+                                     "white", "red", flow_right_median_ * 90, view_angle_);
+          gesture_feedback = true;
+        }
+      }
+
+      if (!gesture_feedback)
+      {
+        // General Feedback
+        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+                                   "white", "green", 90, view_angle_);
+      }
+
     }
     break;
   }
@@ -519,10 +641,10 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Target lost during close range interaction, waiting for a while ...");
       ToggleVisualServo(false);
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "red", "white", 6);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "red", "black", 6);
     }
 
-    if (mode_duration.toSec() > 10.0)
+    if (mode_duration.toSec() > 30.0)
     {
       ROS_WARN("[BEH] Recovery failed");
       Transition(constants::MODE_IDLE);
