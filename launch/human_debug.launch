@@ -34,6 +34,7 @@
     <arg name="input_topic" value="bebop/image_raw" />
     <arg name="output" value="screen" />
     <arg name="debug_mode" value="18" />
+    <arg name="start_paused" value="true" />
   </include>
 
   <node name="rqt_human" type="rqt_gui" pkg="rqt_gui" args="--clear-config -f -l --perspective-file $(find bebop_hri)/rqt/human.perspective" output="log" />

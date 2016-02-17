@@ -18,6 +18,7 @@
 #include "bebop_msgs/Ardrone3PilotingStateAltitudeChanged.h"
 #include "obzerver_ros/Tracks.h"
 #include "geometry_msgs/Twist.h"
+#include "autonomy_human/human.h"
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
@@ -42,16 +43,17 @@ enum bebop_mode_t
   MODE_APPROACHING_LOST = 5,
   MODE_FOLLOWING_PERSON = 6,
   MODE_CLOSERANGE_ENGAGED = 7,
-  MODE_MANUAL = 8,
-  MODE_BAD_VIDEO = 9,
+  MODE_CLOSERANGE_LOST = 8,
+  MODE_MANUAL = 9,
+  MODE_BAD_VIDEO = 10,
   MODE_NUM
 };
 
 const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 {
   "Idle", "Searching", "Long-range Engaging", "Long-range Engaged",
-  "Approaching The person", "Lost The Person", "Following The Person",
-  "Close-range Engaged",
+  "Approaching The person", "Lost The Person (Approach)", "Following The Person",
+  "Close-range Engaged", "Lost The Person (Close-range)",
   "Manual (Joy Override)", "Stale Video", "NAN"
 };
 
@@ -123,6 +125,7 @@ protected:
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAttitudeChanged> sub_bebop_att_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAltitudeChanged> sub_bebop_alt_;
   behavior_tools::ASyncSub<sensor_msgs::CameraInfo> sub_camera_info_;
+  behavior_tools::ASyncSub<autonomy_human::human> sub_human_;
 
   // To reset/initialize the visualal tracker
   ros::Publisher pub_cftld_tracker_reset_;
@@ -134,6 +137,9 @@ protected:
 
   // To enable/disable obzerver
   ros::Publisher pub_obzerver_enable_;
+
+  // To enable/disable autonomy_human
+  ros::Publisher pub_human_enable_;
 
   // To move the camera
   ros::Publisher pub_bebop_camera_;
@@ -172,6 +178,8 @@ protected:
 
   void ToggleVisualServo(const bool enable);
   void ToggleObzerver(const bool enable);
+  void ToggleAutonomyHuman(const bool enable);
+
   void MoveBebopCamera(const double& pan_deg, const double& tilt_deg);
 
   void Reset();

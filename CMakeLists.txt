@@ -15,6 +15,7 @@ find_package(catkin REQUIRED COMPONENTS
   bebop_vservo
   obzerver_ros
   autonomy_leds_msgs
+  autonomy_human
 )
 
 

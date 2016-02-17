@@ -20,11 +20,13 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     sub_bebop_att_(nh_, "bebop/states/ARDrone3/PilotingState/AttitudeChanged", 10),
     sub_bebop_alt_(nh_, "bebop/states/ARDrone3/PilotingState/AltitudeChanged", 10),
     sub_camera_info_(nh_, "bebop/camera_info", 1),
+    sub_human_(nh, "human/human", 10),
     pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("visual_tracker_reset", 1, true)),
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
     pub_obzerver_enable_(nh_.advertise<std_msgs::Bool>("obzerver/enable", 1, true)),
+    pub_human_enable_(nh_.advertise<std_msgs::Bool>("human/enable", 1, true)),
     pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_NUM),
@@ -58,6 +60,8 @@ void BebopBehaviorNode::Reset()
   ROS_WARN("[BEH] Behavior Reset");
   pub_cftld_tracker_reset_.publish(msg_empty_);
   ToggleVisualServo(false);
+  ToggleObzerver(false);
+  ToggleAutonomyHuman(false);
 }
 
 void BebopBehaviorNode::ToggleVisualServo(const bool enable)
@@ -74,8 +78,16 @@ void BebopBehaviorNode::ToggleObzerver(const bool enable)
   pub_obzerver_enable_.publish(bool_msg);
 }
 
+void BebopBehaviorNode::ToggleAutonomyHuman(const bool enable)
+{
+  std_msgs::Bool bool_msg;
+  bool_msg.data = enable;
+  pub_human_enable_.publish(bool_msg);
+}
+
 void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &tilt_deg)
 {
+  ROS_DEBUG_STREAM("[BEH] Request to move Bebop's camera to " << tilt_deg);
   geometry_msgs::Twist twist;
   twist.angular.y = tilt_deg;
   twist.angular.z = pan_deg;
@@ -111,6 +123,7 @@ void BebopBehaviorNode::UpdateBehavior()
   sub_visual_tracker_track_.DeactivateIfOlderThan(5.0);
   sub_bebop_att_.DeactivateIfOlderThan(1.0);
   sub_bebop_alt_.DeactivateIfOlderThan(1.0);
+  sub_human_.DeactivateIfOlderThan(1.0);
   // The tolerance on camera_info_sub is lower
   sub_camera_info_.DeactivateIfOlderThan(0.5);
 
@@ -288,7 +301,6 @@ void BebopBehaviorNode::UpdateBehavior()
     }
 
     // TODO: Add confidence
-    // TODO: Reset obzerver
     if (sub_visual_tracker_track_.IsActive() &&
         sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING)
     {
@@ -305,8 +317,9 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
-      ROS_INFO_STREAM("[BEH] Enabling visual servo ...");
+      ROS_INFO_STREAM("[BEH] Enabling visual servo and human detector...");
       ToggleVisualServo(true);
+      ToggleAutonomyHuman(true);
     }
 
     // Visual tracker's inactiviy is either caused by input stream's being stale or
@@ -315,21 +328,14 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_ERROR_STREAM("[BEH] Visual tracker is stale, this should never happen.");
 
-      // TODO: Disable visual servo
+      ToggleVisualServo(false);
+      ToggleAutonomyHuman(false);
       Transition(constants::MODE_APPROACHING_LOST);
       break;
     }
 
 
     const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
-
-    ROS_ASSERT(sub_camera_info_()->width != 0);
-    const int view_angle_ = -180.0 * (((double(t.roi.width / 2.0)+ t.roi.x_offset)
-                                      / sub_camera_info_()->width) - 0.5);
-
-    led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
-                               "green", "blue", 90, view_angle_);
-
 
     // TODO: Add confidence
     if (t.status != cftld_ros::Track::STATUS_TRACKING)
@@ -339,6 +345,14 @@ void BebopBehaviorNode::UpdateBehavior()
     }
     else
     {
+      // Feedback
+      ROS_ASSERT(sub_camera_info_()->width != 0);
+      const int view_angle_ = -180.0 * (((double(t.roi.width / 2.0)+ t.roi.x_offset)
+                                        / sub_camera_info_()->width) - 0.5);
+
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+                                 "green", "blue", 90, view_angle_);
+
       msg_vservo_target_.header.stamp = ros::Time::now();
 
       // re-initialize the servo, only when in mode transition and not from a previous override mode
@@ -351,8 +365,10 @@ void BebopBehaviorNode::UpdateBehavior()
 
       msg_vservo_target_.desired_depth = param_servo_desired_depth_;
       msg_vservo_target_.target_distance_ground = param_target_dist_ground_;
-      msg_vservo_target_.target_height = param_target_height_;
-      msg_vservo_target_.roi = t.roi;
+      msg_vservo_target_.target_height_m = param_target_height_;
+      // TODO: FIX ME
+      msg_vservo_target_.target_width_m = param_target_height_;
+      msg_vservo_target_.roi = t.roi;  // roi was enforced to be rect when cftld_ros was being initialized
       // vservo node will cache this value on its first call or when reinit=true
       // ignores it all other time
       msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
@@ -364,9 +380,30 @@ void BebopBehaviorNode::UpdateBehavior()
       {
         const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
         const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.5 - alt_target);
+        ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
+                                 << " alt_bebop: " << sub_bebop_alt_()->altitude
+                                 << " tilt_rel: " << tilt);
         MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * 22.5);
       }
       // END
+
+      if (sub_human_.IsActive() && (sub_human_()->status == autonomy_human::human::STATUS_TRACKING))
+      {
+        const autonomy_human::human& human = sub_human_.GetMsgCopy();
+        const float face_roi_intersect = util::GetROIIntersectArea(t.roi, human.faceROI);
+        const float face_area = static_cast<float>(human.faceROI.width * human.faceROI.height);
+        if (face_area > 0)
+        {
+          ROS_WARN_STREAM("[BEH] Human found: Face score: " << human.faceScore << " Area: "
+                          << face_area << " Intersection with roi: " << face_roi_intersect);
+          if ((human.numFaces > 0) &&
+              (human.faceScore > 5) &&
+              ((face_roi_intersect / face_area) > 0.5))
+          {
+            Transition(constants::MODE_CLOSERANGE_ENGAGED);
+          }
+        }
+      }
     }
 
     break;
@@ -392,6 +429,113 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO("[BEH] Recovery has been succesful");
       Transition(constants::MODE_APPROACHING_PERSON);
+    }
+    break;
+  }
+
+  case constants::MODE_CLOSERANGE_ENGAGED:
+  {
+    if (is_transition)
+    {
+      ROS_INFO_STREAM("[BEH] Close range interaction ...");
+      ToggleVisualServo(true);
+    }
+
+    // Human tracker's inactiviy is either caused by input stream's being stale or
+    // a crash. The former needs a seperate recovery case since this node can also detects it.
+    if (!sub_human_.IsActive())
+    {
+      ROS_ERROR_STREAM("[BEH] Human tracker is stale, this should never happen.");
+
+      ToggleVisualServo(false);
+      Transition(constants::MODE_CLOSERANGE_LOST);
+      break;
+    }
+
+    const autonomy_human::human& h = sub_human_.GetMsgCopy();
+
+    if ((h.status != autonomy_human::human::STATUS_TRACKING))
+    {
+      ROS_WARN("[BEH] Tracker has lost the human");
+      Transition(constants::MODE_CLOSERANGE_LOST);
+    }
+    else
+    {
+      // Feedback
+      ROS_ASSERT(sub_camera_info_()->width != 0);
+      const int view_angle_ = -180.0 * (((double(h.faceROI.width / 2.0)+ h.faceROI.x_offset)
+                                        / sub_camera_info_()->width) - 0.5);
+
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+                                 "white", "green", 90, view_angle_);
+
+
+      msg_vservo_target_.header.stamp = ros::Time::now();
+
+      // re-initialize the servo, only when in mode transition and not from a previous override mode
+
+      msg_vservo_target_.reinit = static_cast<bool>(is_transition &&
+                                   (bebop_mode_prev_ != constants::MODE_BAD_VIDEO) &&
+                                   (bebop_mode_prev_ != constants::MODE_MANUAL) &&
+                                   (bebop_mode_prev_ != constants::MODE_CLOSERANGE_LOST)
+                                   );
+
+      msg_vservo_target_.desired_depth = param_servo_desired_depth_ + 1.0;
+      msg_vservo_target_.target_distance_ground = 1.2; //param_target_dist_ground_;
+
+      //https://upload.wikimedia.org/wikipedia/commons/6/61/HeadAnthropometry.JPG
+      //msg_vservo_target_.target_height_m = 0.3;
+      //msg_vservo_target_.target_width_m = 0.2;
+      msg_vservo_target_.target_height_m = 0.2;
+      msg_vservo_target_.target_width_m = 0.2;
+
+      msg_vservo_target_.roi = h.faceROI;
+      // vservo node will cache this value on its first call or when reinit=true
+      // ignores it all other time
+      msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
+
+      ROS_INFO_STREAM("[BEH] CLOSE RANGE SERVO: " <<
+               h.faceROI.x_offset << " " << h.faceROI.y_offset << " " << h.faceROI.width << " " << h.faceROI.height);
+      pub_visual_servo_target_.publish(msg_vservo_target_);
+
+      // Experimental
+      if (sub_bebop_att_.IsActive())
+      {
+        const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
+        const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.5 - alt_target);
+        ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
+                                 << " alt_bebop: " << sub_bebop_alt_()->altitude
+                                 << " tilt_rel: " << tilt);
+        MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * 22.5);
+      }
+      // END
+    }
+    break;
+  }
+
+  case constants::MODE_CLOSERANGE_LOST:
+  {
+    if (is_transition)
+    {
+      ROS_INFO_STREAM("[BEH] Target lost during close range interaction, waiting for a while ...");
+      ToggleVisualServo(false);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "red", "white", 6);
+    }
+
+    if (mode_duration.toSec() > 10.0)
+    {
+      ROS_WARN("[BEH] Recovery failed");
+      Transition(constants::MODE_IDLE);
+      break;
+    }
+
+    if (sub_human_.IsActive() &&
+        sub_human_()->status == autonomy_human::human::STATUS_TRACKING &&
+        sub_human_()->numFaces > 0 &&
+        sub_human_()->faceScore > 5)
+    {
+      ROS_INFO("[BEH] Close range recovery has been succesful");
+      Transition(constants::MODE_CLOSERANGE_ENGAGED);
     }
     break;
   }

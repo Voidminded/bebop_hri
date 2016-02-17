@@ -10,4 +10,6 @@ min_face_height: 12
 max_face_width: 90
 max_face_height: 120
 debug_mode: 6
-
+meas_cov: 1.0
+proc_cov: 0.05
+start_paused: true

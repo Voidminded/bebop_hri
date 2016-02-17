@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <node name="republish_bebop" pkg="image_transport" type="republish" args="compressed in:=bebop/image_raw raw out:=bebop/image_raw" output="screen" />
+    <node name="republish_cftl" pkg="image_transport" type="republish" args="compressed in:=cftld/debug_image_raw raw out:=cftld/debug_image_raw" output="screen" />
+    <node name="republish_human" pkg="image_transport" type="republish" args="compressed in:=human/debug/image_raw raw out:=human/debug/image_raw" output="screen" />
+    <node name="republish_optical" pkg="image_transport" type="republish" args="compressed in:=human/optical/image_raw raw out:=human/optical/image_raw" output="screen" />
+    <node name="republish_obz" pkg="image_transport" type="republish" args="compressed in:=obzerver/stablized/image_raw raw out:=obzerver/stablized/image_raw" output="screen" />
+</launch>

@@ -60,4 +60,12 @@
     <arg name="cftld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
   </include>
 
+  <include file="$(find autonomy_human)/launch/autonomy_human.launch">
+    <arg name="param_file" value="$(find bebop_hri)/config/autonomy_human.yaml" />
+    <arg name="input_topic" value="bebop/image_raw" />
+    <arg name="output" value="screen" />
+    <arg name="debug_mode" value="18" />
+    <arg name="start_paused" value="true" />
+  </include>
+
 </launch>
