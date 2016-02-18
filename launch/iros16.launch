@@ -5,32 +5,70 @@
   <arg name="is_bag" default="false" />
   <arg name="plot_servo" default="false" />
   <arg name="obz_logfile" default="/tmp/obzerver_ros" />
+  <arg name="use_alvar" default="false" />
+  <arg name="use_obzerver" default="true" />
 
-  <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
+  <group unless="$(arg is_bag)">
+    <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
 
-  <include file="$(find bebop_tools)/launch/joy_teleop.launch">
-    <arg name="joy_dev" value="$(arg joy_dev)" />
-    <arg name="teleop_config" value="$(find bebop_hri)/config/log710.yaml" />
-  </include>
+    <include file="$(find bebop_tools)/launch/joy_teleop.launch">
+      <arg name="joy_dev" value="$(arg joy_dev)" />
+      <arg name="teleop_config" value="$(find bebop_hri)/config/log710.yaml" />
+    </include>
+    <node ns="bebop" pkg="bebop_driver" name="bebop_driver" type="bebop_driver_node" output="$(arg nodelets_output)">
+      <param name="camera_info_url" value="package://bebop_driver/data/bebop_camera_calib.yaml" />
+      <param name="bebop_ip" value="192.168.42.1" />
+      <rosparam command="load" file="$(find bebop_driver)/config/defaults.yaml" />
+    </node>
+  </group>
+
+  <group if="$(arg use_alvar)">
+    <arg name="marker_size" default="50.0" />
+    <arg name="max_new_marker_error" default="0.08" />
+    <arg name="max_track_error" default="0.2" />
+    <arg name="cam_image_topic" default="bebop/image_raw" />
+    <arg name="cam_info_topic" default="bebop/camera_info" />
+    <arg name="output_frame" default="camera" />
+    <arg name="alvar_max_freq" default="30.0" />
+
+    <!--node name="republish" pkg="image_transport" type="republish" args="compressed in:=bebop/image_raw raw out:=bebop/image_raw" output="screen" /-->
+
+    <node name="ar_track_alvar" pkg="ar_track_alvar" type="individualMarkersNoKinect" respawn="false" output="screen" args="$(arg marker_size) $(arg max_new_marker_error) $(arg max_track_error) $(arg cam_image_topic) $(arg cam_info_topic) $(arg output_frame) $(arg alvar_max_freq)">
+      <remap from="roi" to="rqt_image_view/clicked_roi" />
+    </node>
+  </group>
 
   <include file="$(find bebop_hri)/launch/behavior.launch">
     <arg name="param_file" value="$(find bebop_hri)/config/behavior.yaml" />
   </include>
 
-  <include file="$(find obzerver_ros)/launch/obzerver.launch">
-    <arg name="input_topic" value="bebop/image_raw" />
-    <arg name="obz_logfile" value="$(arg obz_logfile)" />
-    <arg name="obz_configfile" value="$(find bebop_hri)/config/obz_bebop.ini" />
-    <arg name="param_file" value="$(find bebop_hri)/config/obzerver.yaml" />
-    <arg name="output" value="screen" />
-    <arg name="start_paused" value="true" />
-  </include>
+  <group if="$(arg use_obzerver)">
+    <include file="$(find obzerver_ros)/launch/obzerver.launch">
+      <arg name="input_topic" value="bebop/image_raw" />
+      <arg name="obz_logfile" value="$(arg obz_logfile)" />
+      <arg name="obz_configfile" value="$(find bebop_hri)/config/obz_bebop.ini" />
+      <arg name="param_file" value="$(find bebop_hri)/config/obzerver.yaml" />
+      <arg name="output" value="screen" />
+      <arg name="start_paused" value="true" />
+    </include>
+  </group>
 
+  <!-- this one is used by vservo node -->
   <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">
-    <arg name="param_file" value="$(find bebop_vel_ctrl)/config/bebop_vel_ctrl.yaml" />
+    <arg name="param_file" value="$(find bebop_hri)/config/vel_ctrl_servo.yaml" />
     <arg name="output" value="log" />
     <arg name="input_topic" value="vservo/cmd_vel" />
     <arg name="output_topic" value="velctrl/cmd_vel" />
+  </include>
+
+  <!-- this one is used by the behavior node -->
+  <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">
+    <arg name="name" value="abs_vel_ctrl" />
+    <arg name="param_file" value="$(find bebop_hri)/config/vel_ctrl_abs.yaml" />
+    <arg name="output" value="screen" />
+    <arg name="input_topic" value="abs_vel_ctrl/setpoint/cmd_vel" />
+    <arg name="output_topic" value="abs_vel_ctrl/cmd_vel" />
+    <arg name="debug_topic" value="abs_vel_ctrl/debug" />
   </include>
 
   <include file="$(find bebop_vservo)/launch/bebop_vservo.launch">
@@ -44,14 +82,6 @@
     <rosparam file="$(find bebop_hri)/config/twist_mux.yaml" command="load"/>
     <rosparam file="$(find bebop_hri)/config/twist_mux_locks.yaml" command="load"/>
   </node>
-
-  <group unless="$(arg is_bag)">
-    <node ns="bebop" pkg="bebop_driver" name="bebop_driver" type="bebop_driver_node" output="$(arg nodelets_output)">
-      <param name="camera_info_url" value="package://bebop_driver/data/bebop_camera_calib.yaml" />
-      <param name="bebop_ip" value="192.168.42.1" />
-      <rosparam command="load" file="$(find bebop_driver)/config/defaults.yaml" />
-    </node>
-  </group>
 
   <include file="$(find cftld_ros)/launch/cftld_node.launch">
     <!--arg name="output" value="$(arg nodelets_output)" /-->

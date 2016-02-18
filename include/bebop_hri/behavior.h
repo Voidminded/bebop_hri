@@ -43,9 +43,11 @@ enum bebop_mode_t
   MODE_APPROACHING_LOST = 5,
   MODE_FOLLOWING_PERSON = 6,
   MODE_CLOSERANGE_ENGAGED = 7,
-  MODE_CLOSERANGE_LOST = 8,
-  MODE_MANUAL = 9,
-  MODE_BAD_VIDEO = 10,
+  MODE_CLOSETANGE_RIGHTCOMMNAD = 8,
+  MODE_CLOSETANGE_LEFTCOMMNAD = 9,
+  MODE_CLOSERANGE_LOST = 10,
+  MODE_MANUAL = 11,
+  MODE_BAD_VIDEO = 12,
   MODE_NUM
 };
 
@@ -53,7 +55,7 @@ const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 {
   "Idle", "Searching", "Long-range Engaging", "Long-range Engaged",
   "Approaching The person", "Lost The Person (Approach)", "Following The Person",
-  "Close-range Engaged", "Lost The Person (Close-range)",
+  "Close-range Engaged", "Right hand command", "Left hand command", "Lost The Person (Close-range)",
   "Manual (Joy Override)", "Stale Video", "NAN"
 };
 
@@ -155,6 +157,8 @@ protected:
   // To move the camera
   ros::Publisher pub_bebop_camera_;
   ros::Publisher pub_bebop_flip_;
+  ros::Publisher pub_bebop_snapshot_;
+  ros::Publisher pub_bebop_abs_vel_;
 
   util::StringPublisher status_publisher_;
 
@@ -205,6 +209,11 @@ protected:
   int32_t param_flow_queue_size_;
   bool param_enable_camera_control_;
   double param_max_camera_tilt_deg_;
+  double param_search_alt_;
+
+  // For search mode
+  bool desired_search_inited_;
+  double desired_search_yaw_;
 
   void ToggleVisualServo(const bool enable);
   void ToggleObzerver(const bool enable);
@@ -212,7 +221,9 @@ protected:
 
   void MoveBebopCamera(const double& pan_deg, const double& tilt_deg);
   void BebopFlip(const uint8_t flip_type);
+  void BebopSnapshot();
   void ControlBebopCamera();
+  void PerformSearchAction();
 
   void Reset();
   void UpdateParams();

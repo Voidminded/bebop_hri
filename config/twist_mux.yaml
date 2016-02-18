@@ -7,10 +7,15 @@
 
 topics:
 -
-  name    : navigation
+  name    : vservo
   topic   : velctrl/cmd_vel
   timeout : 0.5
   priority: 10
+-
+  name    : abs_vel_ctrl
+  topic   : abs_vel_ctrl/cmd_vel
+  timeout : 0.5
+  priority: 50
 -
   name    : joystick
   topic   : joy/cmd_vel

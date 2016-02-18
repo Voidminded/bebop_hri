@@ -2,6 +2,8 @@
 #include <std_msgs/Empty.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/UInt8.h>
+#include <angles/angles.h>
+#include <geometry_msgs/Twist.h>
 
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
@@ -30,6 +32,8 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_human_enable_(nh_.advertise<std_msgs::Bool>("human/enable", 1, true)),
     pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
     pub_bebop_flip_(nh_.advertise<std_msgs::UInt8>("bebop/flip", 1, false)),
+    pub_bebop_snapshot_(nh_.advertise<std_msgs::Empty>("bebop/snapshot", 1, false)),
+    pub_bebop_abs_vel_(nh_.advertise<geometry_msgs::Twist>("abs_vel_ctrl/setpoint/cmd_vel", 10, false)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_NUM),
     bebop_mode_prev_(constants::MODE_NUM),
@@ -45,7 +49,8 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     flow_right_median_(0.0),
     gest_left_counter_(0.0),
     gest_right_counter_(0.0),
-    gesture_both_counter_(0.0)
+    gesture_both_counter_(0.0),
+    desired_search_inited_(false)
 {
   UpdateParams();
   Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
@@ -66,6 +71,9 @@ void BebopBehaviorNode::UpdateParams()
   util::get_param(priv_nh_, "flow_queue_size", param_flow_queue_size_, 19);
   util::get_param(priv_nh_, "enable_camera_control", param_enable_camera_control_, true);
   util::get_param(priv_nh_, "max_camera_tilt", param_max_camera_tilt_deg_, 22.5);
+  util::get_param(priv_nh_, "search_alt", param_search_alt_, 2.75);
+
+  ROS_ASSERT(param_search_alt_ > 0.5 && param_search_alt_ < 40.0);
 }
 
 void BebopBehaviorNode::Reset()
@@ -125,6 +133,7 @@ void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &til
 
 void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
 {
+  return;
   ROS_WARN_STREAM("[BEH] Flip requested: " << flip_type);
   std_msgs::UInt8 ft_msg;
   // TODO: bound check
@@ -132,18 +141,51 @@ void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
   pub_bebop_flip_.publish(ft_msg);
 }
 
+void BebopBehaviorNode::BebopSnapshot()
+{
+  ROS_WARN("[BEH] Taking a snapshot ...");
+  std_msgs::Empty empty_msg;
+  pub_bebop_snapshot_.publish(empty_msg);
+}
+
 void BebopBehaviorNode::ControlBebopCamera()
 {
-  if (sub_bebop_att_.IsActive())
+  if (sub_bebop_alt_.IsActive())
   {
     const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
-    const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (2.75 - alt_target);
+    const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target);
     ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
                              << " alt_bebop: " << sub_bebop_alt_()->altitude
                              << " tilt_rel: " << tilt);
-    MoveBebopCamera(0.0, -CLAMP(tilt, -1.0, 1.0) * param_max_camera_tilt_deg_);
+    MoveBebopCamera(0.0, -CLAMP(tilt, 0.0, 1.0) * param_max_camera_tilt_deg_);
   }
 }
+
+void BebopBehaviorNode::PerformSearchAction()
+{
+  // The search behavior (absolute mode)
+  // Prioritize yaw if the error is big
+  geometry_msgs::Twist search_twist_;
+  bool yaw_priority = true;
+  double yaw_err;
+  if (sub_bebop_att_.IsActive() && sub_bebop_alt_.IsActive())
+  {
+    yaw_err = angles::shortest_angular_distance(-sub_bebop_att_()->yaw, desired_search_yaw_);
+    if (fabs(yaw_err) < angles::from_degrees(15)) yaw_priority = false;
+  }
+
+//  ROS_WARN_STREAM("[BEH] Current Yaw: " << angles::to_degrees(-sub_bebop_att_()->yaw) <<
+//                  " desired yaw: " << angles::to_degrees(desired_search_yaw_) << " yaw err" << angles::to_degrees(yaw_err));
+
+  search_twist_.linear.x = 0.0;
+  search_twist_.linear.y = 0.0;
+  search_twist_.linear.z = (yaw_priority) ? sub_bebop_alt_()->altitude : param_search_alt_;
+  search_twist_.angular.x = 0.0;
+  search_twist_.angular.y = 0.0;
+  search_twist_.angular.z = desired_search_yaw_;
+  pub_bebop_abs_vel_.publish(search_twist_);
+}
+
 
 bool BebopBehaviorNode::GestureUpdate()
 {
@@ -251,6 +293,13 @@ void BebopBehaviorNode::UpdateBehavior()
         !sub_joy_()->buttons[param_joy_override_button_] &&
         sub_joy_()->buttons[param_joy_reset_button_];
 
+    if ((mode_duration.toSec() > 8.0) && !desired_search_inited_ && sub_bebop_att_.IsActive())
+    {
+      desired_search_yaw_ = -(sub_bebop_att_()->yaw);
+      desired_search_inited_ = true;
+      ROS_WARN_STREAM("[BEH] Desired search yaw is set to: " << angles::to_degrees(desired_search_yaw_));
+    }
+
     if ((mode_duration.toSec() > param_idle_timeout_) || (manual_reset))
     {
       Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
@@ -336,8 +385,10 @@ void BebopBehaviorNode::UpdateBehavior()
       MoveBebopCamera(0.0, -param_max_camera_tilt_deg_);
     }
 
-    // User Feedback
+    // constantly go to search_alt and search_yaw (x,y=0)
+    PerformSearchAction();
 
+    // User Feedback
     if (sub_all_tracks_.IsActive() && sub_all_tracks_()->tracks.size())
     {
       const obzerver_ros::Tracks& all_tracks = sub_all_tracks_.GetMsgCopy();
@@ -354,18 +405,20 @@ void BebopBehaviorNode::UpdateBehavior()
         }
       }
 
-      if ((current_promising_tracks > 0) && (promising_tracks == 0))
-      {
-        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "blue", "white", 5.0);
-      }
+      // Ask Sepehr why!
+//      if ((current_promising_tracks > 0) && (promising_tracks == 0))
+//      {
+//        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "green", "blue", 5.0);
+//      }
 
-      if ((current_promising_tracks == 0) && (promising_tracks >0))
-      {
-        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
-      }
+//      if ((current_promising_tracks == 0) && (promising_tracks >0))
+//      {
+//        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
+//      }
 
       promising_tracks = current_promising_tracks;
     }
+
     // The manual ROI has a higher priority than obzerver
     if (sub_manual_roi_.IsActive())
     {
@@ -601,10 +654,15 @@ void BebopBehaviorNode::UpdateBehavior()
       if (GestureUpdate() && gesture_curr_ != constants::GESTURE_NONE)
       {
         ROS_ERROR_STREAM("[BEH Gesture Detected: " << GESTURE_STR(gesture_curr_));
-        if (gesture_curr_ = constants::GESTURE_RIGHT_SWING)
+        if (gesture_curr_ == constants::GESTURE_RIGHT_SWING)
         {
-          BebopFlip(1);
-          Transition(constants::MODE_IDLE);
+          Transition(constants::MODE_CLOSETANGE_RIGHTCOMMNAD);
+          break;
+        }
+        if (gesture_curr_ == constants::GESTURE_LEFT_SWING)
+        {
+          Transition(constants::MODE_CLOSETANGE_LEFTCOMMNAD);
+          break;
         }
       }
       else
@@ -632,6 +690,51 @@ void BebopBehaviorNode::UpdateBehavior()
       }
 
     }
+    break;
+  }
+
+  case constants::MODE_CLOSETANGE_RIGHTCOMMNAD:
+  {
+    if (is_transition && (bebop_mode_prev_ == constants::MODE_CLOSERANGE_ENGAGED))
+    {
+      ROS_INFO_STREAM("[BEH] Selfie!");
+      BebopSnapshot();
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK,
+                                 "white", "white", 5);
+    }
+
+    if (mode_duration.toSec() > 3.0)
+    {
+      Transition(constants::MODE_CLOSERANGE_ENGAGED);
+    }
+
+    break;
+  }
+
+  case constants::MODE_CLOSETANGE_LEFTCOMMNAD:
+  {
+    if (is_transition && (bebop_mode_prev_ == constants::MODE_CLOSERANGE_ENGAGED))
+    {
+      ROS_INFO_STREAM("[BEH] Bye Bye!");
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK,
+                                 "blue", "blue", 0.5);
+    }
+
+    if (mode_duration.toSec() > 1.0)
+    {
+      if (sub_bebop_att_.IsActive())
+      {
+        desired_search_yaw_ = angles::normalize_angle(3.14156 - sub_bebop_att_()->yaw);
+      }
+      else
+      {
+        desired_search_yaw_ = angles::normalize_angle(3.14156 + desired_search_yaw_);
+      }
+
+      ROS_WARN_STREAM("Desired yaw: " << angles::to_degrees(desired_search_yaw_));
+      Transition(constants::MODE_SEARCHING);
+    }
+
     break;
   }
 
