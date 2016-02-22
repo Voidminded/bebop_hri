@@ -41,6 +41,7 @@
   <run_depend>obzerver_ros</run_depend>
   <run_depend>topic_tools</run_depend>
   <run_depend>autonomy_human</run_depend>
+  <run_depend>vicon_bridge</run_depend>
 
   <export>
   </export>

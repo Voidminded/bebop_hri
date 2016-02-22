@@ -7,6 +7,10 @@
   <arg name="obz_logfile" default="/tmp/obzerver_ros" />
   <arg name="use_alvar" default="false" />
   <arg name="use_obzerver" default="true" />
+  <arg name="use_cftld" default="true" /> <!-- or fake it? -->
+  <arg name="use_vicon" default="false" />
+  <arg name="use_human" default="true" />
+  <arg name="behavior_param_file" default="$(find bebop_hri)/config/behavior.yaml" />
 
   <group unless="$(arg is_bag)">
     <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
@@ -23,7 +27,7 @@
   </group>
 
   <group if="$(arg use_alvar)">
-    <arg name="marker_size" default="50.0" />
+    <arg name="marker_size" default="56.5" />
     <arg name="max_new_marker_error" default="0.08" />
     <arg name="max_track_error" default="0.2" />
     <arg name="cam_image_topic" default="bebop/image_raw" />
@@ -39,7 +43,7 @@
   </group>
 
   <include file="$(find bebop_hri)/launch/behavior.launch">
-    <arg name="param_file" value="$(find bebop_hri)/config/behavior.yaml" />
+    <arg name="param_file" value="$(arg behavior_param_file)" />
   </include>
 
   <group if="$(arg use_obzerver)">
@@ -83,19 +87,33 @@
     <rosparam file="$(find bebop_hri)/config/twist_mux_locks.yaml" command="load"/>
   </node>
 
-  <include file="$(find cftld_ros)/launch/cftld_node.launch">
-    <!--arg name="output" value="$(arg nodelets_output)" /-->
-    <arg name="output" value="screen" />
-    <arg name="cftld_param_file" value="$(find cftld_ros)/config/default.yaml" />
-    <arg name="cftld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
-  </include>
+  <group if="$(arg use_cftld)">
+    <include file="$(find cftld_ros)/launch/cftld_node.launch">
+      <!--arg name="output" value="$(arg nodelets_output)" /-->
+      <arg name="output" value="screen" />
+      <arg name="cftld_param_file" value="$(find cftld_ros)/config/default.yaml" />
+      <arg name="cftld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
+    </include>
+  </group>
 
-  <include file="$(find autonomy_human)/launch/autonomy_human.launch">
-    <arg name="param_file" value="$(find bebop_hri)/config/autonomy_human.yaml" />
-    <arg name="input_topic" value="bebop/image_raw" />
-    <arg name="output" value="screen" />
-    <arg name="debug_mode" value="18" />
-    <arg name="start_paused" value="true" />
-  </include>
+  <group unless="$(arg use_cftld)">
+    <node name="fake_tracker" type="fake_tracker_node" pkg="cftld_ros" output="log">
+      <remap from="roi" to="rqt_image_view/clicked_roi" />
+      <remap from="track" to="cftld/track" />
+    </node>
+  </group>
 
+  <group if="$(arg use_human)">
+    <include file="$(find autonomy_human)/launch/autonomy_human.launch">
+      <arg name="param_file" value="$(find bebop_hri)/config/autonomy_human.yaml" />
+      <arg name="input_topic" value="bebop/image_raw" />
+      <arg name="output" value="screen" />
+      <arg name="debug_mode" value="18" />
+      <arg name="start_paused" value="true" />
+    </include>
+  </group>
+
+  <group if="$(arg use_vicon)">
+    <include file="$(find bebop_hri)/launch/vicon.launch" />
+  </group>
 </launch>

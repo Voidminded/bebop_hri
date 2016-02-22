@@ -45,3 +45,6 @@
     local-name: rqt_common_plugins
     uri: https://github.com/Voidminded/rqt_common_plugins.git
     version: master
+- git:
+    local-name: vicon_bridge
+    uri: https://github.com/ethz-asl/vicon_bridge.git

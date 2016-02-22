@@ -68,22 +68,20 @@ void BebopBehaviorNode::UpdateParams()
   util::get_param(priv_nh_, "target_height", param_target_height_, 0.5);
   util::get_param(priv_nh_, "target_dist_ground", param_target_dist_ground_, 0.75);
   util::get_param(priv_nh_, "stale_video_timeout", param_stale_video_timeout_, 10.0);
-  util::get_param(priv_nh_, "flow_queue_size", param_flow_queue_size_, 19);
   util::get_param(priv_nh_, "enable_camera_control", param_enable_camera_control_, true);
   util::get_param(priv_nh_, "max_camera_tilt", param_max_camera_tilt_deg_, 22.5);
   util::get_param(priv_nh_, "search_alt", param_search_alt_, 2.75);
+  util::get_param(priv_nh_, "perform_search_action", param_perform_search_action_, false);
+
+  util::get_param(priv_nh_, "flow_queue_size", param_flow_queue_size_, 15);
+  util::get_param(priv_nh_, "flow_threshold", param_flow_threshold_, 6.0);
+  util::get_param(priv_nh_, "flow_min_votes", param_flow_min_votes_, 15);
 
   ROS_ASSERT(param_search_alt_ > 0.5 && param_search_alt_ < 40.0);
 }
 
-void BebopBehaviorNode::Reset()
+void BebopBehaviorNode::ResetGestures()
 {
-  ROS_WARN("[BEH] Behavior Reset");
-  pub_cftld_tracker_reset_.publish(msg_empty_);
-  ToggleVisualServo(false);
-  ToggleObzerver(false);
-  ToggleAutonomyHuman(false);
-
   flow_left_vec_.clear();
   flow_right_vec_.clear();
   gesture_curr_ = constants::GESTURE_NONE;
@@ -93,6 +91,21 @@ void BebopBehaviorNode::Reset()
   gest_left_counter_ = 0;
   gest_right_counter_ = 0;
   gesture_both_counter_ = 0;
+}
+
+void BebopBehaviorNode::ResetVisualTracker()
+{
+  pub_cftld_tracker_reset_.publish(msg_empty_);
+}
+
+void BebopBehaviorNode::Reset()
+{
+  ROS_WARN("[BEH] Behavior Reset");
+  ResetVisualTracker();
+  ToggleVisualServo(false);
+  ToggleObzerver(false);
+  ToggleAutonomyHuman(false);
+  ResetGestures();
 }
 
 void BebopBehaviorNode::ToggleVisualServo(const bool enable)
@@ -200,24 +213,25 @@ bool BebopBehaviorNode::GestureUpdate()
     // TODO: config
     // gesture_filter_zero: 0.1
     // gesture_filter_threshold: 3.2
-    bool left = ( flow_left_median_ > 5.0) && ( flow_right_median_ < 0.1 );
-    bool right = ( flow_right_median_ > 5.0) && ( flow_left_median_ <  0.1 );
-    bool both = ( flow_left_median_ > 5.0) && ( flow_right_median_ > 5.0);
+    bool left = ( flow_left_median_ > param_flow_threshold_) && ( flow_right_median_ < 0.1 );
+    bool right = ( flow_right_median_ > param_flow_threshold_) && ( flow_left_median_ <  0.1 );
+    bool both = ( flow_left_median_ > param_flow_threshold_) &&
+        ( flow_right_median_ > param_flow_threshold_) &&
+        ( fabs(flow_left_median_ - flow_right_median_) < 0.25 * param_flow_threshold_);
 
     gest_left_counter_ = left ? gest_left_counter_+1 : 0;
     gest_right_counter_ = right ? gest_right_counter_+1 : 0;
     gesture_both_counter_ = both ? gesture_both_counter_+1 :  0;
 
     // TODO: Config
-    // gesture_sync_window: 4
     gesture_prev_ = gesture_curr_;
     gesture_curr_ = constants::GESTURE_NONE;
-    if ((gest_left_counter_ > 10) && (gest_right_counter_ == 0)) gesture_curr_ = constants::GESTURE_LEFT_SWING;
-    if ((gest_right_counter_ > 10) && (gest_left_counter_ == 0)) gesture_curr_ = constants::GESTURE_RIGHT_SWING;
+    if ((gest_left_counter_ > param_flow_min_votes_) && (gest_right_counter_ == 0)) gesture_curr_ = constants::GESTURE_LEFT_SWING;
+    if ((gest_right_counter_ > param_flow_min_votes_) && (gest_left_counter_ == 0)) gesture_curr_ = constants::GESTURE_RIGHT_SWING;
     // High Priority
-    if (gesture_both_counter_ > 10) gesture_curr_ = constants::GESTURE_BOTH_SWING;
+    if (gesture_both_counter_ > param_flow_min_votes_) gesture_curr_ = constants::GESTURE_BOTH_SWING;
 
-    ROS_INFO_THROTTLE(0.25, "[BEH] Left: (%.3f, %2d) Right: (%.3f, %2d) Both: (%2d) G: %d ",
+    ROS_DEBUG_THROTTLE(0.25, "[BEH] Left: (%.3f, %2d) Right: (%.3f, %2d) Both: (%2d) G: %d ",
              flow_left_median_, (int) gest_left_counter_,  flow_right_median_, (int) gest_right_counter_, (int) gesture_both_counter_, gesture_curr_ );
     return true;
 }
@@ -248,7 +262,7 @@ void BebopBehaviorNode::UpdateBehavior()
   sub_manual_roi_.DeactivateIfOlderThan(1.0);
   sub_periodic_tracks_.DeactivateIfOlderThan(0.5);
   sub_all_tracks_.DeactivateIfOlderThan(0.5);
-  sub_visual_tracker_track_.DeactivateIfOlderThan(5.0);
+  sub_visual_tracker_track_.DeactivateIfOlderThan(2.0);
   sub_bebop_att_.DeactivateIfOlderThan(1.0);
   sub_bebop_alt_.DeactivateIfOlderThan(1.0);
   sub_human_.DeactivateIfOlderThan(1.0);
@@ -380,44 +394,60 @@ void BebopBehaviorNode::UpdateBehavior()
   {
     if (is_transition)
     {
+      ROS_INFO("[BEH] Searching ...");
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
       ToggleObzerver(true);
-      MoveBebopCamera(0.0, -param_max_camera_tilt_deg_);
+      ToggleAutonomyHuman(false);
+      ResetVisualTracker();
+
+      if (!param_enable_camera_control_) MoveBebopCamera(0.0, -param_max_camera_tilt_deg_);
+      break;
     }
 
     // constantly go to search_alt and search_yaw (x,y=0)
-    PerformSearchAction();
-
-    // User Feedback
-    if (sub_all_tracks_.IsActive() && sub_all_tracks_()->tracks.size())
+    if (param_perform_search_action_)
     {
-      const obzerver_ros::Tracks& all_tracks = sub_all_tracks_.GetMsgCopy();
-      uint32_t current_promising_tracks = 0;
-
-      for (uint32_t i = 0; i < all_tracks.tracks.size(); ++i)
-      {
-        const obzerver_ros::Track& track = all_tracks.tracks[i];
-        if ((track.displacement < 20.0) &&
-            (track.status == obzerver_ros::Track::STATUS_TRACKING)
-            /* && (track.dominant_freq > 0.0)*/)
-        {
-          current_promising_tracks++;
-        }
-      }
-
-      // Ask Sepehr why!
-//      if ((current_promising_tracks > 0) && (promising_tracks == 0))
-//      {
-//        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "green", "blue", 5.0);
-//      }
-
-//      if ((current_promising_tracks == 0) && (promising_tracks >0))
-//      {
-//        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
-//      }
-
-      promising_tracks = current_promising_tracks;
+      ROS_WARN_ONCE("[BEH] Search action is enabled.");
+      PerformSearchAction();
     }
+
+    if (param_enable_camera_control_) ControlBebopCamera();
+
+    // 1 second timeout for Reset() and Search action to work
+    if (mode_duration.toSec() < 1.0)
+    {
+      break;
+    }
+    // User Feedback
+//    if (sub_all_tracks_.IsActive() && sub_all_tracks_()->tracks.size())
+//    {
+//      const obzerver_ros::Tracks& all_tracks = sub_all_tracks_.GetMsgCopy();
+//      uint32_t current_promising_tracks = 0;
+
+//      for (uint32_t i = 0; i < all_tracks.tracks.size(); ++i)
+//      {
+//        const obzerver_ros::Track& track = all_tracks.tracks[i];
+//        if ((track.displacement < 20.0) &&
+//            (track.status == obzerver_ros::Track::STATUS_TRACKING)
+//            /* && (track.dominant_freq > 0.0)*/)
+//        {
+//          current_promising_tracks++;
+//        }
+//      }
+
+//      // Ask Sepehr why!
+////      if ((current_promising_tracks > 0) && (promising_tracks == 0))
+////      {
+////        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK, "green", "blue", 5.0);
+////      }
+
+////      if ((current_promising_tracks == 0) && (promising_tracks >0))
+////      {
+////        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
+////      }
+
+//      promising_tracks = current_promising_tracks;
+//    }
 
     // The manual ROI has a higher priority than obzerver
     if (sub_manual_roi_.IsActive())
@@ -433,15 +463,27 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_WARN_STREAM("[BEH] Found " << sub_periodic_tracks_()->tracks.size() << " periodic tracks.");
 
-      const obzerver_ros::Track pt = sub_periodic_tracks_.GetMsgCopy().tracks[0];
-      const int32_t img_w = sub_periodic_tracks_()->max_width;
-      const int32_t img_h = sub_periodic_tracks_()->max_height;
-      ROS_WARN_STREAM("[BEH]  Frequency: " << pt.dominant_freq);
-      ROS_WARN_STREAM("[BEH]  Displacement: " << pt.displacement);
-
-      // TODO: param me
-      if (pt.displacement < 30.0)
+      int32_t selected_id = -1;
+      double max_freq = 0.0;
+      for (uint32_t i = 0; i < sub_periodic_tracks_()->tracks.size(); ++i)
       {
+        const obzerver_ros::Track& pt = sub_periodic_tracks_.GetMsgCopy().tracks[i];
+        if (pt.displacement < 30.0 && pt.dominant_freq > max_freq)
+        {
+          selected_id = i;
+          max_freq = pt.dominant_freq;
+        }
+      }
+
+      if (selected_id > 0)
+      {
+        const obzerver_ros::Track& pt = sub_periodic_tracks_.GetMsgCopy().tracks[selected_id];
+        const int32_t img_w = sub_periodic_tracks_()->max_width;
+        const int32_t img_h = sub_periodic_tracks_()->max_height;
+        ROS_WARN_STREAM("[BEH]  ID: " << selected_id);
+        ROS_WARN_STREAM("[BEH]  Frequency: " << pt.dominant_freq);
+        ROS_WARN_STREAM("[BEH]  Displacement: " << pt.displacement);
+
         sensor_msgs::RegionOfInterest roi = pt.roi;
         int32_t roi_wh = std::max(pt.roi.width, pt.roi.height);
         if (roi.width + roi_wh > img_w) roi_wh = img_w - roi.x_offset - 1;
@@ -455,6 +497,10 @@ void BebopBehaviorNode::UpdateBehavior()
 
         pub_cftld_tracker_init_.publish(roi);
         ToggleObzerver(false);
+      }
+      else
+      {
+        ROS_WARN("[BEH] None of periodic tracks were stationary enough.");
       }
     }
 
@@ -478,7 +524,9 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_INFO_STREAM("[BEH] Enabling visual servo and human detector...");
       ToggleVisualServo(true);
       ToggleAutonomyHuman(true);
+      ResetGestures();
     }
+
 
     // Visual tracker's inactiviy is either caused by input stream's being stale or
     // a crash. The former needs a seperate recovery case since this node can also detects it.
@@ -586,8 +634,8 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Close range interaction ...");
       ToggleVisualServo(true);
-      flow_left_vec_.clear();
-      flow_right_vec_.clear();
+      ResetVisualTracker();
+      ResetGestures();
     }
 
     // Human tracker's inactiviy is either caused by input stream's being stale or
@@ -654,73 +702,89 @@ void BebopBehaviorNode::UpdateBehavior()
       if (GestureUpdate() && gesture_curr_ != constants::GESTURE_NONE)
       {
         ROS_ERROR_STREAM("[BEH Gesture Detected: " << GESTURE_STR(gesture_curr_));
-        if (gesture_curr_ == constants::GESTURE_RIGHT_SWING)
+        if ((gesture_curr_ == constants::GESTURE_RIGHT_SWING) ||
+            (gesture_curr_ == constants::GESTURE_LEFT_SWING))
         {
-          Transition(constants::MODE_CLOSETANGE_RIGHTCOMMNAD);
+          Transition(constants::MODE_CLOSERANGE_SINGLECOMMNAD);
           break;
         }
-        if (gesture_curr_ == constants::GESTURE_LEFT_SWING)
+        if (gesture_curr_ == constants::GESTURE_BOTH_SWING)
         {
-          Transition(constants::MODE_CLOSETANGE_LEFTCOMMNAD);
+          Transition(constants::MODE_CLOSERANGE_DOUBLECOMMNAD);
           break;
         }
       }
       else
       {
-        if (flow_left_median_ > 1.0 && flow_left_median_ > flow_right_median_)
+        if ((flow_left_median_ > 1.0 && flow_left_median_ > flow_right_median_))
         {
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
-                                     "white", "blue", flow_left_median_ * 90, view_angle_);
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                     "green", "white", 20, view_angle_);
           gesture_feedback = true;
         }
 
-        if (flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_)
+        if ((flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_))
         {
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
-                                     "white", "red", flow_right_median_ * 90, view_angle_);
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                     "white", "green", 20, view_angle_);
           gesture_feedback = true;
         }
+
+        if (flow_left_median_ > 1.0 && flow_right_median_ > 1.0 && fabs(flow_left_median_ - flow_left_median_) < 1.0)
+        {
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                     "green", "green", 20, view_angle_);
+          gesture_feedback = true;
+        }
+
+//        if (flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_)
+//        {
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+//                                     "white", "red", flow_right_median_ * 90, view_angle_);
+//          gesture_feedback = true;
+//        }
       }
 
       if (!gesture_feedback)
       {
         // General Feedback
-        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
-                                   "white", "green", 90, view_angle_);
+        led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                   "white", "white", 10, view_angle_);
       }
 
     }
     break;
   }
 
-  case constants::MODE_CLOSETANGE_RIGHTCOMMNAD:
+  case constants::MODE_CLOSERANGE_SINGLECOMMNAD:
   {
     if (is_transition && (bebop_mode_prev_ == constants::MODE_CLOSERANGE_ENGAGED))
     {
       ROS_INFO_STREAM("[BEH] Selfie!");
-      BebopSnapshot();
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK,
-                                 "white", "white", 5);
+      // This feedback type is handcrafted for three seconds of duration
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_TIMER_SNAP,
+                                 "white", "blue", 10);
     }
 
     if (mode_duration.toSec() > 3.0)
     {
+      BebopSnapshot();
       Transition(constants::MODE_CLOSERANGE_ENGAGED);
     }
 
     break;
   }
 
-  case constants::MODE_CLOSETANGE_LEFTCOMMNAD:
+  case constants::MODE_CLOSERANGE_DOUBLECOMMNAD:
   {
     if (is_transition && (bebop_mode_prev_ == constants::MODE_CLOSERANGE_ENGAGED))
     {
       ROS_INFO_STREAM("[BEH] Bye Bye!");
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FULL_BLINK,
-                                 "blue", "blue", 0.5);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_BYEBYE,
+                                 "black", "cyan", 3.0);
     }
 
-    if (mode_duration.toSec() > 1.0)
+    if (mode_duration.toSec() > 3.0)
     {
       if (sub_bebop_att_.IsActive())
       {

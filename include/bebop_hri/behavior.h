@@ -43,8 +43,8 @@ enum bebop_mode_t
   MODE_APPROACHING_LOST = 5,
   MODE_FOLLOWING_PERSON = 6,
   MODE_CLOSERANGE_ENGAGED = 7,
-  MODE_CLOSETANGE_RIGHTCOMMNAD = 8,
-  MODE_CLOSETANGE_LEFTCOMMNAD = 9,
+  MODE_CLOSERANGE_SINGLECOMMNAD = 8,
+  MODE_CLOSERANGE_DOUBLECOMMNAD = 9,
   MODE_CLOSERANGE_LOST = 10,
   MODE_MANUAL = 11,
   MODE_BAD_VIDEO = 12,
@@ -55,7 +55,7 @@ const std::string STR_BEBOP_MODE_MAP[MODE_NUM + 1] =
 {
   "Idle", "Searching", "Long-range Engaging", "Long-range Engaged",
   "Approaching The person", "Lost The Person (Approach)", "Following The Person",
-  "Close-range Engaged", "Right hand command", "Left hand command", "Lost The Person (Close-range)",
+  "Close-range Engaged", "Single hand command", "Double hands command", "Lost The Person (Close-range)",
   "Manual (Joy Override)", "Stale Video", "NAN"
 };
 
@@ -97,6 +97,7 @@ private:
     c.r = 0.9, c.g = 0.0, c.b = 0.9, colors["magenta"] = c;
     c.r = 0.9, c.g = 0.9, c.b = 0.0, colors["yellow"] = c;
     c.r = 0.9, c.g = 0.9, c.b = 0.9, colors["white"] = c;
+    c.r = 0.0, c.g = 0.0, c.b = 0.0, colors["black"] = c;
   }
 
 
@@ -207,9 +208,12 @@ protected:
   double param_servo_desired_depth_;
   double param_stale_video_timeout_;
   int32_t param_flow_queue_size_;
+  double param_flow_threshold_;
+  int32_t param_flow_min_votes_;
   bool param_enable_camera_control_;
   double param_max_camera_tilt_deg_;
   double param_search_alt_;
+  bool param_perform_search_action_;
 
   // For search mode
   bool desired_search_inited_;
@@ -226,6 +230,8 @@ protected:
   void PerformSearchAction();
 
   void Reset();
+  void ResetGestures();
+  void ResetVisualTracker();
   void UpdateParams();
   void UpdateBehavior();
   inline void Transition(const constants::bebop_mode_t& new_mode)

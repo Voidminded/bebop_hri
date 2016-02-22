@@ -1,6 +1,6 @@
- 8047  rostopic echo -b 2016-01-18-11-56-51_processed.bag -p /bebop/states/ARDrone3/PilotingState/AttitudeChanged > 2016-01-18-11-56-51_att.csv
- 8050  rostopic echo -b 2016-01-18-11-56-51_processed.bag -p /bebop/cmd_vel_stamped > 2016-01-18-11-56-51_cmdvel.csv
- 8051  rostopic echo -b 2016-01-18-11-56-51_processed.bag -p bebop_msgs/Ardrone3PilotingStateSpeedChanged > 2016-01-18-11-56-51_speed.csv
- 8052  rostopic echo -b 2016-01-18-11-56-51_processed.bag -p vicon/bebop_blue_en/bebop_blue_en > 2016-01-18-11-56-51_vicon.csv
- 8055  rostopic echo -b 2016-01-18-11-56-51_processed.bag -p /bebop/states/ARDrone3/PilotingState/SpeedChanged > 2016-01-18-11-56-51_speed.csv
+ $ rostopic echo -b 2016-01-18-11-56-51_processed.bag -p /bebop/states/ARDrone3/PilotingState/Att:itudeChanged > 2016-01-18-11-56-51_att.csv
+ $ rostopic echo -b 2016-01-18-11-56-51_processed.bag -p /bebop/cmd_vel_stamped > 2016-01-18-11-56-51_cmdvel.csv
+ $ rostopic echo -b 2016-01-18-11-56-51_processed.bag -p bebop_msgs/Ardrone3PilotingStateSpeedChanged > 2016-01-18-11-56-51_speed.csv
+ $ rostopic echo -b 2016-01-18-11-56-51_processed.bag -p vicon/bebop_blue_en/bebop_blue_en > 2016-01-18-11-56-51_vicon.csv
+ $ rostopic echo -b 2016-01-18-11-56-51_processed.bag -p /bebop/states/ARDrone3/PilotingState/SpeedChanged > 2016-01-18-11-56-51_speed.csv
 

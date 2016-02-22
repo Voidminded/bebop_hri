@@ -12,4 +12,8 @@ target_dist_ground: 1.0
 stale_video_timeout: 10.0
 enable_camera_control: true
 max_camera_tilt_deg: 22.5
-search_alt: 2.5
+search_alt: 6.5
+perform_search_action: false
+flow_queue_size: 15
+flow_threshold: 6.0
+flow_min_votes: 15

@@ -5,14 +5,14 @@
       "keys": {
         "running-plugins": {
           "type": "repr", 
-          "repr": "{u'rqt_image_view/ImageView': [3, 2, 1]}"
+          "repr": "{u'rqt_image_view/ImageView': [4, 3, 2, 1]}"
         }
       }, 
       "groups": {
-        "plugin__rqt_image_view__ImageView__2": {
+        "plugin__rqt_image_view__ImageView__4": {
           "keys": {}, 
           "groups": {
-            "dock_widget__": {
+            "dock_widget__ImageViewWidget": {
               "keys": {
                 "dockable": {
                   "type": "repr", 
@@ -29,19 +29,58 @@
               "keys": {
                 "dynamic_range": {
                   "type": "repr", 
-                  "repr": "u'false'"
+                  "repr": "False"
                 }, 
                 "max_range": {
                   "type": "repr", 
-                  "repr": "u'0.01'"
+                  "repr": "10.0"
                 }, 
                 "topic": {
                   "type": "repr", 
-                  "repr": "u'/cftld/debug_image_raw'"
+                  "repr": "u'/human/debug/image_raw/compressed'"
                 }, 
                 "zoom1": {
                   "type": "repr", 
-                  "repr": "u'true'"
+                  "repr": "True"
+                }
+              }, 
+              "groups": {}
+            }
+          }
+        }, 
+        "plugin__rqt_image_view__ImageView__2": {
+          "keys": {}, 
+          "groups": {
+            "dock_widget__ImageViewWidget": {
+              "keys": {
+                "dockable": {
+                  "type": "repr", 
+                  "repr": "True"
+                }, 
+                "parent": {
+                  "type": "repr", 
+                  "repr": "None"
+                }
+              }, 
+              "groups": {}
+            }, 
+            "plugin": {
+              "keys": {
+                "dynamic_range": {
+                  "type": "repr", 
+                  "repr": "False"
+                }, 
+                "max_range": {
+                  "type": "repr", 
+                  "repr": "10.0"
+                }, 
+                "topic": {
+                  "type": "repr", 
+                  "repr": "u'/cftld/debug_image_raw/compressed'"
+                }, 
+                "zoom1": {
+                  "type": "repr", 
+                  "repr": "True"
                 }
               }, 
               "groups": {}
@@ -51,7 +90,7 @@
         "plugin__rqt_image_view__ImageView__3": {
           "keys": {}, 
           "groups": {
-            "dock_widget__": {
+            "dock_widget__ImageViewWidget": {
               "keys": {
                 "dockable": {
                   "type": "repr", 
@@ -68,19 +107,19 @@
               "keys": {
                 "dynamic_range": {
                   "type": "repr", 
-                  "repr": "u'false'"
+                  "repr": "False"
                 }, 
                 "max_range": {
                   "type": "repr", 
-                  "repr": "u'0.01'"
+                  "repr": "10.0"
                 }, 
                 "topic": {
                   "type": "repr", 
-                  "repr": "u'/obzerver/stablized/image_raw'"
+                  "repr": "u'/obzerver/stablized/image_raw/compressed'"
                 }, 
                 "zoom1": {
                   "type": "repr", 
-                  "repr": "u'true'"
+                  "repr": "True"
                 }
               }, 
               "groups": {}
@@ -90,11 +129,11 @@
         "plugin__rqt_image_view__ImageView__1": {
           "keys": {}, 
           "groups": {
-            "dock_widget__": {
+            "dock_widget__ImageViewWidget": {
               "keys": {
                 "dockable": {
                   "type": "repr", 
-                  "repr": "u'true'"
+                  "repr": "True"
                 }, 
                 "parent": {
                   "type": "repr", 
@@ -107,19 +146,19 @@
               "keys": {
                 "dynamic_range": {
                   "type": "repr", 
-                  "repr": "u'false'"
+                  "repr": "False"
                 }, 
                 "max_range": {
                   "type": "repr", 
-                  "repr": "u'0.01'"
+                  "repr": "10.0"
                 }, 
                 "topic": {
                   "type": "repr", 
-                  "repr": "u'/bebop/image_raw'"
+                  "repr": "u'/bebop/image_raw/compressed'"
                 }, 
                 "zoom1": {
                   "type": "repr", 
-                  "repr": "u'true'"
+                  "repr": "True"
                 }
               }, 
               "groups": {}
@@ -132,13 +171,13 @@
       "keys": {
         "geometry": {
           "type": "repr(QByteArray.hex)", 
-          "repr(QByteArray.hex)": "QtCore.QByteArray('01d9d0cb000100000000005a0000005a000006bc000004ac0000006400000080000006b2000004a2000000010000')", 
-          "pretty-print": "     Z Z     d         "
+          "repr(QByteArray.hex)": "QtCore.QByteArray('01d9d0cb000100000000019200000066000006d50000040e0000019200000066000006d50000040e000000010000')", 
+          "pretty-print": "       f       f       "
         }, 
         "state": {
           "type": "repr(QByteArray.hex)", 
-          "repr(QByteArray.hex)": "QtCore.QByteArray('000000ff00000000fd00000001000000030000064f000003f4fc0100000002fc00000000000002cc0000019200fffffffc0200000002fb0000003c007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0032005f005f0100000019000001b60000008400fffffffb0000003c007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0031005f005f01000001d5000002380000008400fffffffb0000003c007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0033005f005f01000002d20000037d0000019200ffffff0000064f0000000000000004000000040000000800000008fc00000001000000030000000100000036004d0069006e0069006d0069007a006500640044006f0063006b00570069006400670065007400730054006f006f006c0062006100720000000000ffffffff0000000000000000')", 
-          "pretty-print": "                                                                                                        8                                        }     O                                                      "
+          "repr(QByteArray.hex)": "QtCore.QByteArray('000000ff00000000fd0000000100000003000005440000037afc0100000002fc00000000000002940000029400000294fc0200000002fb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0033005f005f0049006d0061006700650056006900650077005700690064006700650074010000001a000001ba000001ba000001bafb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0031005f005f0049006d006100670065005600690065007700570069006400670065007401000001d6000001ba000001ba000001bafc00000294000002b00000029400000294fc0200000002fb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0034005f005f0049006d0061006700650056006900650077005700690064006700650074010000001a000001ba000001ba000001bafb0000005a007200710074005f0069006d006100670065005f0076006900650077005f005f0049006d0061006700650056006900650077005f005f0032005f005f0049006d006100670065005600690065007700570069006400670065007401000001d6000001ba000001ba000001ba0000052e0000000000000004000000040000000800000008fc00000001000000030000000100000036004d0069006e0069006d0069007a006500640044006f0063006b00570069006400670065007400730054006f006f006c0062006100720000000000ffffffff0000000000000000')", 
+          "pretty-print": "                                                                                                                                                        Zrqt_image_view__ImageView__4__ImageViewWidget          Zrqt_image_view__ImageView__2__ImageViewWidget                            6MinimizedDockWidgetsToolbar        "
         }
       }, 
       "groups": {
@@ -146,7 +185,7 @@
           "keys": {
             "MinimizedDockWidgetsToolbar": {
               "type": "repr", 
-              "repr": "u'8'"
+              "repr": "8"
             }
           }, 
           "groups": {}
