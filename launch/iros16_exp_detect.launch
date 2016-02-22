@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find bebop_hri)/launch/iros16.launch">
+    <arg name="use_alvar" value="true" />
+    <arg name="use_obzerver" value="false" />
+    <arg name="use_cftld" value="false" />
+    <arg name="use_vicon" value="true" />
+    <arg name="use_human" value="false" />
+    <arg name="behavior_param_file" value="$(find bebop_hri)/config/behavior_artag.yaml" />
+  </include>
+</launch>

@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="joy_dev" default="/dev/input/js0" />
+  <arg name="plan_file" default="$(find bebop_hri)/config/vel_exp_plan.yaml" />
+
+  <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
+
+  <include file="$(find bebop_tools)/launch/joy_teleop.launch">
+    <arg name="joy_dev" value="$(arg joy_dev)" />
+    <arg name="teleop_config" value="$(find bebop_hri)/config/log710.yaml" />
+  </include>
+
+  <node ns="bebop" pkg="bebop_driver" name="bebop_driver" type="bebop_driver_node" output="screen">
+    <param name="camera_info_url" value="package://bebop_driver/data/bebop_camera_calib.yaml" />
+    <param name="bebop_ip" value="192.168.42.1" />
+    <rosparam command="load" file="$(find bebop_driver)/config/defaults.yaml" />
+  </node>
+
+  <include file="$(find bebop_vel_ctrl)/launch/bebop_vel_ctrl.launch">
+    <arg name="param_file" value="$(find bebop_hri)/config/vel_ctrl_servo.yaml" />
+    <arg name="output" value="log" />
+    <arg name="input_topic" value="vservo/cmd_vel" />
+    <arg name="output_topic" value="velctrl/cmd_vel" />
+  </include>
+
+  <include file="$(find bebop_vel_ctrl)/launch/bebop_trajectory_generator.launch">
+    <arg name="plan_file" value="$(arg plan_file)" />
+    <arg name="output_topic" value="vservo/cmd_vel" />
+  </include>
+
+  <node pkg="twist_mux" type="twist_mux" name="twist_mux" output="log">
+    <remap from="cmd_vel_out" to="/bebop/cmd_vel" />
+    <rosparam file="$(find bebop_hri)/config/twist_mux.yaml" command="load"/>
+    <rosparam file="$(find bebop_hri)/config/twist_mux_locks.yaml" command="load"/>
+  </node>
+
+  <include file="$(find bebop_hri)/launch/vicon.launch" />
+</launch>

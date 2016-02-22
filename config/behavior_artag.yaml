@@ -1,0 +1,14 @@
+update_freq: 30.0
+initial_mode: 0
+joy_override_buttion: 7
+joy_override_timeout: 15.0
+joy_reset_buttion: 6
+idle_timeout: 10
+servo_desired_depth: 2.5
+target_height: 0.56
+target_dist_ground: 0.85
+stale_video_timeout: 10.0
+enable_camera_control: false
+max_camera_tilt_deg: 22.5
+search_alt: 2.5
+perform_search_action: false
