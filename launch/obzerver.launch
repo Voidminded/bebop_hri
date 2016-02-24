@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<launch>
+  <arg name="obz_logfile" default="/tmp/obzerver_ros" />
+  <arg name="start_paused" default="false" />
+  <include file="$(find obzerver_ros)/launch/obzerver.launch">
+    <arg name="input_topic" value="bebop/image_raw" />
+    <arg name="obz_logfile" value="$(arg obz_logfile)" />
+    <arg name="obz_configfile" value="$(find bebop_hri)/config/obz_bebop.ini" />
+    <arg name="param_file" value="$(find bebop_hri)/config/obzerver.yaml" />
+    <arg name="output" value="screen" />
+    <arg name="start_paused" value="$(arg start_paused)" />
+  </include>
+</launch>
