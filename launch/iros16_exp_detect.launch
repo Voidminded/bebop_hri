@@ -8,4 +8,8 @@
     <arg name="use_human" value="false" />
     <arg name="behavior_param_file" value="$(find bebop_hri)/config/behavior_artag.yaml" />
   </include>
+  <rosparam>
+    bebop_vservo_node:
+      land_on_small_error: true
+  </rosparam>
 </launch>
