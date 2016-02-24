@@ -11,6 +11,7 @@
 #include <map>
 
 // This is a placeholder for obzerver
+#include <image_geometry/pinhole_camera_model.h>
 #include <sensor_msgs/RegionOfInterest.h>
 #include "cftld_ros/Track.h"
 #include "bebop_vservo/Target.h"
@@ -150,7 +151,7 @@ protected:
   ros::Publisher pub_visual_servo_target_;
 
   // To enable/disable obzerver
-  ros::Publisher pub_obzerver_enable_;
+  ros::Publisher pub_obzerver_init_;
 
   // To enable/disable autonomy_human
   ros::Publisher pub_human_enable_;
@@ -169,6 +170,7 @@ protected:
   bebop_vservo::Target msg_vservo_target_;
 
   // internal stuff
+  image_geometry::PinholeCameraModel cam_model_;
   constants::bebop_mode_t bebop_mode_;  // current bebop state
   constants::bebop_mode_t bebop_mode_prev_;  // prev bebop state
   constants::bebop_mode_t bebop_mode_prev_update_; // bebop state in previous timestep
@@ -201,6 +203,7 @@ protected:
   int32_t param_init_mode_;
   int32_t param_joy_override_button_;
   int32_t param_joy_reset_button_;
+  int32_t param_joy_setyaw_button_;
   double param_idle_timeout_;
   double param_joy_override_timeout_;
   double param_target_height_;
@@ -220,7 +223,13 @@ protected:
   double desired_search_yaw_;
 
   void ToggleVisualServo(const bool enable);
-  void ToggleObzerver(const bool enable);
+  void ToggleObzerver(const bool enable,
+                      const uint32_t roi_min_height = 0,
+                      const uint32_t roi_min_width = 0,
+                      const uint32_t roi_max_height = 0,
+                      const uint32_t roi_max_width = 0);
+
+
   void ToggleAutonomyHuman(const bool enable);
 
   void MoveBebopCamera(const double& pan_deg, const double& tilt_deg);
@@ -228,6 +237,7 @@ protected:
   void BebopSnapshot();
   void ControlBebopCamera();
   void PerformSearchAction();
+  bool SetDesiredYaw();
 
   void Reset();
   void ResetGestures();

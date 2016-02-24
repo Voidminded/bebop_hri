@@ -14,6 +14,7 @@ delay_compensation_factor: 0.7
 
 # since this vel_ctrl has a higher priority in the mux, do not send zeros when inactive
 safety_send_zero: false
+zero_xy_hover: true
 
 pid_forward:
   p: 0.2

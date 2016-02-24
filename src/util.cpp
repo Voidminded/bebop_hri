@@ -43,7 +43,7 @@ void StringPublisher::Append(const std::string& str)
 
 void StringPublisher::Append(const double d)
 {
-  buffer << std::setprecision(3) << d;
+  buffer << std::setprecision(2) << std::fixed << d;
 }
 
 void StringPublisher::Append(const int i)
@@ -63,7 +63,7 @@ void StringPublisher::Append(const std::string &str, const int i)
   Append(i);
 }
 
-StringPublisher& StringPublisher::operator <<(const StringPublisher& rhs)
+StringPublisher& StringPublisher::operator<<(const StringPublisher& rhs)
 {
   Append(rhs.GetBuffer().str());
   return *this;
@@ -72,6 +72,12 @@ StringPublisher& StringPublisher::operator <<(const StringPublisher& rhs)
 StringPublisher& StringPublisher::operator<<(const std::string &str)
 {
   Append(str);
+  return *this;
+}
+
+StringPublisher& StringPublisher::operator <<(const char* str)
+{
+  Append(std::string(str));
   return *this;
 }
 

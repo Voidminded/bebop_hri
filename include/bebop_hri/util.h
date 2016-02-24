@@ -11,6 +11,17 @@ namespace bebop_hri
 namespace util
 {
 
+template <typename T> inline T clamp (T x, T a, T b)
+{
+    return ((x) > (a) ? ((x) < (b) ? (x) : (b)) : (a));
+}
+
+template <typename T> inline T mapValue(T x, T a, T b, T c, T d)
+{
+    x = clamp(x, a, b);
+    return c + (d - c) * (x - a) / (b - a);
+}
+
 template<class T>
 inline void get_param(const ros::NodeHandle& nh,
                       const std::string& param_name, T& var, const T default_value)
@@ -50,6 +61,7 @@ public:
 
   StringPublisher& operator<<(const StringPublisher& rhs);
   StringPublisher& operator<<(const std::string &str);
+  StringPublisher& operator<<(const char* str);
   StringPublisher& operator<<(const double d);
   StringPublisher& operator<<(const int i);
 

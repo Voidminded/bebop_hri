@@ -8,6 +8,7 @@
 #include "bebop_hri/util.h"
 #include "bebop_hri/behavior_tools.h"
 #include "bebop_hri/behavior.h"
+#include "obzerver_ros/Init.h"
 
 namespace bebop_hri
 {
@@ -28,7 +29,7 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
-    pub_obzerver_enable_(nh_.advertise<std_msgs::Bool>("obzerver/enable", 1, true)),
+    pub_obzerver_init_(nh_.advertise<obzerver_ros::Init>("obzerver/enable", 1, true)),
     pub_human_enable_(nh_.advertise<std_msgs::Bool>("human/enable", 1, true)),
     pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
     pub_bebop_flip_(nh_.advertise<std_msgs::UInt8>("bebop/flip", 1, false)),
@@ -63,6 +64,7 @@ void BebopBehaviorNode::UpdateParams()
   util::get_param(priv_nh_, "joy_override_buttion", param_joy_override_button_, 7);
   util::get_param(priv_nh_, "joy_override_timeout", param_joy_override_timeout_, 20.0);
   util::get_param(priv_nh_, "joy_reset_button", param_joy_reset_button_, 6);
+  util::get_param(priv_nh_, "joy_setyaw_button", param_joy_setyaw_button_, 5);
   util::get_param(priv_nh_, "idle_timeout", param_idle_timeout_, 10.0);
   util::get_param(priv_nh_, "servo_desired_depth", param_servo_desired_depth_, 2.5);
   util::get_param(priv_nh_, "target_height", param_target_height_, 0.5);
@@ -115,11 +117,22 @@ void BebopBehaviorNode::ToggleVisualServo(const bool enable)
   pub_visual_servo_enable_.publish(bool_msg);
 }
 
-void BebopBehaviorNode::ToggleObzerver(const bool enable)
+void BebopBehaviorNode::ToggleObzerver(const bool enable,
+                                       const uint32_t roi_min_height,
+                                       const uint32_t roi_min_width,
+                                       const uint32_t roi_max_height,
+                                       const uint32_t roi_max_width)
 {
-  std_msgs::Bool bool_msg;
-  bool_msg.data = enable;
-  pub_obzerver_enable_.publish(bool_msg);
+  obzerver_ros::Init init_msg;
+  init_msg.enable = enable;
+  if (enable)
+  {
+    init_msg.min_roi.width = roi_min_width;
+    init_msg.min_roi.height = roi_min_height;
+    init_msg.max_roi.width = roi_max_width;
+    init_msg.max_roi.height = roi_max_height;
+  }
+  pub_obzerver_init_.publish(init_msg);
 }
 
 void BebopBehaviorNode::ToggleAutonomyHuman(const bool enable)
@@ -144,6 +157,19 @@ void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &til
   pub_bebop_camera_.publish(twist);
 }
 
+bool BebopBehaviorNode::SetDesiredYaw()
+{
+  if (sub_bebop_att_.IsActive())
+  {
+    desired_search_yaw_ = -(sub_bebop_att_()->yaw);
+    desired_search_inited_ = true;
+    ROS_WARN_STREAM("[BEH] Desired search yaw is set to: " << angles::to_degrees(desired_search_yaw_));
+    return true;
+  }
+  ROS_ERROR("[BEH] SetDesiredYaw() failed.");
+  return false;
+}
+
 void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
 {
   return;
@@ -166,7 +192,8 @@ void BebopBehaviorNode::ControlBebopCamera()
   if (sub_bebop_alt_.IsActive())
   {
     const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
-    const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target);
+    //const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target);
+    const double& tilt = pow((sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target), 0.33);
     ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
                              << " alt_bebop: " << sub_bebop_alt_()->altitude
                              << " tilt_rel: " << tilt);
@@ -217,7 +244,7 @@ bool BebopBehaviorNode::GestureUpdate()
     bool right = ( flow_right_median_ > param_flow_threshold_) && ( flow_left_median_ <  0.1 );
     bool both = ( flow_left_median_ > param_flow_threshold_) &&
         ( flow_right_median_ > param_flow_threshold_) &&
-        ( fabs(flow_left_median_ - flow_right_median_) < 0.25 * param_flow_threshold_);
+        ( fabs(flow_left_median_ - flow_right_median_) < 0.5 * param_flow_threshold_);
 
     gest_left_counter_ = left ? gest_left_counter_+1 : 0;
     gest_right_counter_ = right ? gest_right_counter_+1 : 0;
@@ -249,8 +276,16 @@ void BebopBehaviorNode::UpdateBehavior()
 
   const ros::Duration mode_duration = ros::Time::now() - last_transition_time_;
 
-  status_publisher_ << "Current State: '" << constants::STR_BEBOP_MODE_MAP[bebop_mode_].c_str() << "'";
-  status_publisher_ << " Duration: " << mode_duration.toSec();
+  status_publisher_ << "Current State: " << constants::STR_BEBOP_MODE_MAP[bebop_mode_].c_str() << ", ";
+  status_publisher_ << " Duration: " << mode_duration.toSec() << ", ";
+  status_publisher_ << " Manual ROI: " << sub_manual_roi_.IsActive() << ", ";
+  status_publisher_ << " Number of periodic tracks: " << static_cast<int>(sub_periodic_tracks_.IsActive() ? sub_periodic_tracks_()->tracks.size() : 0) << ", ";
+  status_publisher_ << " Visual tracker: " <<
+                       ((sub_visual_tracker_track_.IsActive() && sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING) ? "Yes" : "No")
+                       << ", ";
+  status_publisher_ << " Human Num Faces: " << static_cast<int>(sub_human_.IsActive() ? sub_human_()->numFaces : 0) << ", ";
+  status_publisher_ << " Human Face Score: " << static_cast<int>(sub_human_.IsActive() ? sub_human_()->faceScore : 0) << ", ";
+  status_publisher_ << " Gesture: " << constants::STR_GESTURE_STATES_MAP[gesture_curr_] << ", ";
 
   ROS_DEBUG_THROTTLE(1 , "[BEH] %s", status_publisher_.GetBuffer().str().c_str());
   status_publisher_.Publish();
@@ -307,11 +342,9 @@ void BebopBehaviorNode::UpdateBehavior()
         !sub_joy_()->buttons[param_joy_override_button_] &&
         sub_joy_()->buttons[param_joy_reset_button_];
 
-    if ((mode_duration.toSec() > 8.0) && !desired_search_inited_ && sub_bebop_att_.IsActive())
+    if ((mode_duration.toSec() > 8.0) && !desired_search_inited_)
     {
-      desired_search_yaw_ = -(sub_bebop_att_()->yaw);
-      desired_search_inited_ = true;
-      ROS_WARN_STREAM("[BEH] Desired search yaw is set to: " << angles::to_degrees(desired_search_yaw_));
+      SetDesiredYaw();
     }
 
     if ((mode_duration.toSec() > param_idle_timeout_) || (manual_reset))
@@ -356,6 +389,15 @@ void BebopBehaviorNode::UpdateBehavior()
       break;
     }
 
+    if (sub_joy_.IsActive() &&
+        sub_joy_()->buttons[param_joy_override_button_] &&
+        sub_joy_()->buttons[param_joy_setyaw_button_])
+    {
+      ROS_WARN_STREAM("[BEH] Manual SetYaw Requested ...");
+      SetDesiredYaw();
+      break;
+    }
+
     if (sub_joy_.IsActive() && !sub_joy_()->buttons[param_joy_override_button_])
     {
       ROS_WARN_STREAM("[BEH] Joystick override ended, going back to " << BEBOP_MODE_STR(bebop_resume_mode_manual_));
@@ -370,7 +412,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_ERROR("[BEH] Video STALE mode");
       ToggleVisualServo(false);
-      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "red", "magenta", 1.2);
+      led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_FAST_BLINK, "red", "yellow", 1.2);
     }
 
     if (sub_camera_info_.GetFreshness().toSec() < 0.05)
@@ -396,11 +438,50 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO("[BEH] Searching ...");
       led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_SEARCH_1, "green", "blue", 3);
-      ToggleObzerver(true);
+
+      MoveBebopCamera(0.0, -param_max_camera_tilt_deg_);
+      // Experimental
+      if (sub_camera_info_.IsActive() && sub_bebop_alt_.IsActive())
+      {
+        cam_model_.fromCameraInfo(sub_camera_info_());
+        const double fov_x_ = 2.0 * atan2(cam_model_.fullResolution().width / 2.0, cam_model_.fx());
+        const double fov_y_ = 2.0 * atan2(cam_model_.fullResolution().height/ 2.0, cam_model_.fy());
+
+        const double cam_tilt = angles::from_degrees(param_max_camera_tilt_deg_);
+        const double alt = (param_perform_search_action_) ? param_search_alt_ : sub_bebop_alt_()->altitude;
+
+        ROS_INFO_STREAM_ONCE("[BEH] FOV " << angles::to_degrees(fov_x_) << " " << angles::to_degrees(fov_y_)
+                             << " fx: " << cam_model_.fx() << " fy: " << cam_model_.fy()
+                             << " tilt: " << angles::to_degrees(cam_tilt) << " alt: " << alt);
+
+        // Minimum distance to the camera (for obz): 4m
+        // Maximum distance to the camera (for obz): 30m
+        const double H_min = 1.0;
+        const double H_max = 2.0;
+        const double D1 = alt / sin(cam_tilt + fov_y_ / 2.0);
+        //const double D2 = alt / sin(cam_tilt - fov_y_ / 2.0);
+        const double d_min = std::max(D1, 4.0);
+        //const double  d_max = D2 - (H_min / sin(cam_tilt - fov_y_ / 2.0));
+        const double d_max = 30.0;
+        const double h_min = H_min * (cam_model_.fy() / d_max);
+        const double h_max = H_max * (cam_model_.fy() / d_min);
+        const double w_min = /*(cam_model_.fx() / cam_model_.fy())*/ 0.5 * h_min;
+        const double w_max = /*(cam_model_.fx() / cam_model_.fy())*/ 0.5 * h_max;
+
+        ROS_WARN_STREAM("[BEH] Obzerver ROI min: " << w_min << " x " << h_min << " max: " << w_max << " x " << h_max);
+        ToggleObzerver(true, h_min, w_min, h_max, w_max);
+      }
+      else
+      {
+        ROS_ERROR("[BEH] Not enough info to initial ROI for obzerver, using default values");
+        ToggleObzerver(true, 10, 5, 200, 100);
+      }
+
+      // End Experimental
+
       ToggleAutonomyHuman(false);
       ResetVisualTracker();
 
-      if (!param_enable_camera_control_) MoveBebopCamera(0.0, -param_max_camera_tilt_deg_);
       break;
     }
 
@@ -411,10 +492,10 @@ void BebopBehaviorNode::UpdateBehavior()
       PerformSearchAction();
     }
 
-    if (param_enable_camera_control_) ControlBebopCamera();
+    //if (param_enable_camera_control_) ControlBebopCamera();
 
     // 1 second timeout for Reset() and Search action to work
-    if (mode_duration.toSec() < 1.0)
+    if (mode_duration.toSec() < 3.0)
     {
       break;
     }
@@ -458,6 +539,7 @@ void BebopBehaviorNode::UpdateBehavior()
                       << roi.width << " " << roi.height);
       pub_cftld_tracker_init_.publish(roi);
       ToggleObzerver(false);
+      break;
     }
     else if (sub_periodic_tracks_.IsActive() && sub_periodic_tracks_()->tracks.size())
     {
@@ -465,19 +547,23 @@ void BebopBehaviorNode::UpdateBehavior()
 
       int32_t selected_id = -1;
       double max_freq = 0.0;
-      for (uint32_t i = 0; i < sub_periodic_tracks_()->tracks.size(); ++i)
+      const obzerver_ros::Tracks& all_per_tracks = sub_periodic_tracks_.GetMsgCopy();
+      for (int32_t i = 0; i < all_per_tracks.tracks.size(); ++i)
       {
-        const obzerver_ros::Track& pt = sub_periodic_tracks_.GetMsgCopy().tracks[i];
-        if (pt.displacement < 30.0 && pt.dominant_freq > max_freq)
+        const obzerver_ros::Track& pt = all_per_tracks.tracks[i];
+        ROS_DEBUG_STREAM("[BEH] i: " << i << " disp: " << pt.displacement << " freq: " << pt.dominant_freq);
+        if (pt.status == obzerver_ros::Track::STATUS_TRACKING &&
+            pt.displacement < 30.0 &&
+            pt.dominant_freq > max_freq)
         {
           selected_id = i;
           max_freq = pt.dominant_freq;
         }
       }
 
-      if (selected_id > 0)
+      if (selected_id != -1)
       {
-        const obzerver_ros::Track& pt = sub_periodic_tracks_.GetMsgCopy().tracks[selected_id];
+        const obzerver_ros::Track& pt = all_per_tracks.tracks[selected_id];
         const int32_t img_w = sub_periodic_tracks_()->max_width;
         const int32_t img_h = sub_periodic_tracks_()->max_height;
         ROS_WARN_STREAM("[BEH]  ID: " << selected_id);
@@ -485,11 +571,22 @@ void BebopBehaviorNode::UpdateBehavior()
         ROS_WARN_STREAM("[BEH]  Displacement: " << pt.displacement);
 
         sensor_msgs::RegionOfInterest roi = pt.roi;
+//        int32_t roi_wh = std::max(pt.roi.width, pt.roi.height);
+//        if (roi.width + roi_wh > img_w) roi_wh = img_w - roi.x_offset - 1;
+//        if (roi.height + roi_wh > img_h) roi_wh = img_h - roi.y_offset - 1;
+
         int32_t roi_wh = std::max(pt.roi.width, pt.roi.height);
-        if (roi.width + roi_wh > img_w) roi_wh = img_w - roi.x_offset - 1;
-        if (roi.height + roi_wh > img_h) roi_wh = img_h - roi.y_offset - 1;
+        roi.x_offset -= (roi_wh - roi.width) / 2;
+        roi.y_offset -= (roi_wh - roi.height) / 2;
         roi.width = roi_wh;
         roi.height = roi_wh;
+
+        roi.x_offset = util::clamp<int32_t>(roi.x_offset, 0, cam_model_.fullResolution().width - 1);
+        roi.y_offset = util::clamp<int32_t>(roi.y_offset, 0, cam_model_.fullResolution().height - 1);
+        const int32_t x2 = util::clamp<int32_t>(roi.x_offset + roi.width, 0, cam_model_.fullResolution().width - 1);
+        const int32_t y2 = util::clamp<int32_t>(roi.y_offset + roi.height, 0, cam_model_.fullResolution().height - 1);
+        roi.width = x2 - roi.x_offset;
+        roi.height = y2 - roi.y_offset;
 
         ROS_WARN_STREAM("[BEH] The track is stationary enough [x, y, w, h]: "
                         << roi.x_offset << " , " << roi.y_offset << " , "
@@ -497,10 +594,12 @@ void BebopBehaviorNode::UpdateBehavior()
 
         pub_cftld_tracker_init_.publish(roi);
         ToggleObzerver(false);
+        sub_periodic_tracks_.Deactivate();
+        break;
       }
       else
       {
-        ROS_WARN("[BEH] None of periodic tracks were stationary enough.");
+        ROS_WARN_THROTTLE(1, "[BEH] None of periodic tracks were stationary enough.");
       }
     }
 
@@ -617,6 +716,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_WARN("[BEH] Recovery failed");
       Transition(constants::MODE_IDLE);
+      break;
     }
 
     if (sub_visual_tracker_track_.IsActive() &&
@@ -624,6 +724,18 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO("[BEH] Recovery has been succesful");
       Transition(constants::MODE_APPROACHING_PERSON);
+      break;
+    }
+
+    // Hack by Mani
+    if (sub_human_.IsActive() &&
+        sub_human_()->status == autonomy_human::human::STATUS_TRACKING &&
+        sub_human_()->numFaces > 0 &&
+        sub_human_()->faceScore > 5)
+    {
+      ROS_INFO("[BEH] Approach recovery using face has been succesfull");
+      Transition(constants::MODE_CLOSERANGE_ENGAGED);
+      break;
     }
     break;
   }

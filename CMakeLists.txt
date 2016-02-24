@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   angles
   geometry_msgs
+  image_geometry
   message_generation
   cftld_ros
   bebop_vel_ctrl
