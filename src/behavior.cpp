@@ -263,6 +263,7 @@ bool BebopBehaviorNode::GestureUpdate()
     return true;
 }
 
+
 void BebopBehaviorNode::UpdateBehavior()
 {
   const bool is_transition = (bebop_mode_ != bebop_mode_prev_update_);
@@ -495,7 +496,7 @@ void BebopBehaviorNode::UpdateBehavior()
     //if (param_enable_camera_control_) ControlBebopCamera();
 
     // 1 second timeout for Reset() and Search action to work
-    if (mode_duration.toSec() < 3.0)
+    if (mode_duration.toSec() < 2.0)
     {
       break;
     }
@@ -529,6 +530,18 @@ void BebopBehaviorNode::UpdateBehavior()
 
 //      promising_tracks = current_promising_tracks;
 //    }
+
+    // TODO: Add confidence
+    if (sub_visual_tracker_track_.IsActive() &&
+        sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING)
+    {
+      const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
+      ROS_INFO_STREAM("[BEH] Visual tracker has been initialized. Approaching her ... id: "
+                      <<  t.uid << " confidence: " << t.confidence);
+      ToggleObzerver(false);
+      Transition(constants::MODE_APPROACHING_PERSON);
+      break;
+    }
 
     // The manual ROI has a higher priority than obzerver
     if (sub_manual_roi_.IsActive())
@@ -603,16 +616,6 @@ void BebopBehaviorNode::UpdateBehavior()
       }
     }
 
-    // TODO: Add confidence
-    if (sub_visual_tracker_track_.IsActive() &&
-        sub_visual_tracker_track_()->status == cftld_ros::Track::STATUS_TRACKING)
-    {
-      const cftld_ros::Track& t = sub_visual_tracker_track_.GetMsgCopy();
-      ROS_INFO_STREAM("[BEH] Visual tracker has been initialized. Approaching her ... id: "
-                      <<  t.uid << " confidence: " << t.confidence);
-      ToggleObzerver(false);
-      Transition(constants::MODE_APPROACHING_PERSON);
-    }
     break;
   }
 
@@ -625,7 +628,6 @@ void BebopBehaviorNode::UpdateBehavior()
       ToggleAutonomyHuman(true);
       ResetGestures();
     }
-
 
     // Visual tracker's inactiviy is either caused by input stream's being stale or
     // a crash. The former needs a seperate recovery case since this node can also detects it.

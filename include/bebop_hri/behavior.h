@@ -244,6 +244,7 @@ protected:
   void ResetVisualTracker();
   void UpdateParams();
   void UpdateBehavior();
+
   inline void Transition(const constants::bebop_mode_t& new_mode)
   {
     bebop_mode_prev_ = bebop_mode_;

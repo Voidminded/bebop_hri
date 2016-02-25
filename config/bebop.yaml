@@ -2,8 +2,8 @@ bebop:
   bebop_nodelet:
     GPSSettingsHomeTypeType: 0
     GPSSettingsReturnHomeDelayDelay: 0
-    NetworkSettingsWifiSelectionBand: 0
-    NetworkSettingsWifiSelectionChannel: 1
+    NetworkSettingsWifiSelectionBand: 1
+    NetworkSettingsWifiSelectionChannel: 157
     NetworkSettingsWifiSelectionType: 1
     PilotingSettingsAbsolutControlOn: 0
     PilotingSettingsMaxAltitudeCurrent: 30.0
