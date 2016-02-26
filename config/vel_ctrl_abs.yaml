@@ -6,7 +6,7 @@ model_cy: -0.584975281133000
 update_freq: 30.0
 max_linear_vel: 2.0
 min_alt: 0.5
-max_alt: 2.5
+max_alt: 13.0
 
 # talk to Mani about these two
 feedback_pred_factor: 0.2
