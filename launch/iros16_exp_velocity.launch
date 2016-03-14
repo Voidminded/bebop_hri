@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="joy_dev" default="/dev/input/js0" />
-  <arg name="plan_file" default="$(find bebop_hri)/config/vel_exp_plan_5.yaml" />
+  <arg name="plan_file" default="$(find bebop_hri)/config/vel_exp_plan_6.yaml" />
   <!--arg name="plan_file" default="$(find bebop_hri)/config/vel_exp_plan_2.yaml" /-->
   <!--arg name="plan_file" default="$(find bebop_hri)/config/vel_exp_plan_3.yaml" /-->
 

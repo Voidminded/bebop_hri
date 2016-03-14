@@ -15,13 +15,13 @@ delay_compensation_factor: 0.7
 safety_send_zero: true
 
 pid_forward:
-  p: 0.2
-  i: 0.5
+  p: 0.175
+  i: 0.4
   d: 0.0
   i_clamp: 0.01
 pid_lateral:
-  p: 0.2
-  i: 0.5
+  p: 0.175
+  i: 0.4
   d: 0.0
   i_clamp: 0.01
 pid_yaw:
