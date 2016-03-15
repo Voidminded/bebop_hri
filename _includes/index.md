@@ -6,7 +6,7 @@ This page provides supplementary materials for the following paper, submitted to
 - Authors: [Mani Monajjemi](https://mani.im), [Sepehr Mohaimenianpour](http://sepehr.im) and [Richard Vaughan](https://www.cs.sfu.ca/~vaughan/)
 - Affiliation: [AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca)
 
-**Important Note**: A few of the source code repositories are not made public yet, therefor we provided links to download the latest snapshots of them. As we update this page through the upcoming months, we will make those repositories public and provide more technical details and documentation.
+**Important Note**: A few of the source code repositories are not made public yet, therefor we have provided links to download the latest snapshots of them. As we update this page through the upcoming months, we will make those repositories public and provide more technical details and documentation.
 
 #### Changelog
 
