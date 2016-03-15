@@ -43,13 +43,15 @@ TBA
 
 ##### "bebop_vel_ctrl": Velocity controller for Parrot Bebop Drone (ROS package)
 
-- [Download URL]()
-- SHA1:
+- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-bebop_vel_ctrl-4962f392b33c.tar.gz)
+- Snapshot commit hash: `4962f392b33c`
+- SHA1: `f9f95f75af1efed9da1ca08e3ad06c24081276d9`
 
 ##### "bebop_vservo": Visual servo controller for Parrot Bebop Drone (ROS package)
 
-- [Download URL]()
-- SHA1:
+- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-bebop_vservo-f25bfaaf74d0.tar.gz)
+- Snapshot commit hash: `f25bfaaf74d0`
+- SHA1: `161dbda80075720f07936241b0d8780e3caab41e`
 
 ##### "autonomy_leds": Firmware and animation engine for DotStar LED strips (ROS package)
 
@@ -59,8 +61,9 @@ TBA
 
 ##### "cftld_ros": ROS wrapper for CFTld, a long-term visual tracker
 
-- [Download URL]()
-- SHA1:
+- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-cftld_ros-68eb0b0774ae.tar.gz)
+- Snapshot commit hash: `378029e2b0eb0c61c555710838844cd13e026aab`
+- SHA1: `378029e2b0eb0c61c555710838844cd13e026aab`
 - Based on [CFTld tracker](https://github.com/klahaag/CFtld)
 
 ##### "autonomy_human": Short-range Face Engagement and Optical Flow Based Gesture Detection
@@ -71,5 +74,6 @@ TBA
 
 ##### "bebop_hri": The behavior generator code for the paper
 
-- [Download URL]()
-- SHA1: 
+- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-bebop_hri-2ea50ade4e88.tar.gz)
+- Snapshot commit hash: `2ea50ade4e88`
+- SHA1: `45565286448428879fa46795f6cefa7163c1b8eb`
