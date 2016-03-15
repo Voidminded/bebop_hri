@@ -6,7 +6,7 @@ This page provides supplementary materials for the following paper, submitted to
 - Authors: [Mani Monajjemi](https://mani.im), [Sepehr Mohaimenianpour](http://sepehr.im) and [Richard Vaughan](https://www.cs.sfu.ca/~vaughan/)
 - Affiliation: [AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca)
 
-**Important Note**: A few of the source code repositories are not public yet, therefor we provided links to download the latest snapshots of them. As we update this page through the upcoming months, we will make those repositories public and provide more technical details and documentation.
+**Important Note**: A few of the source code repositories are not made public yet, therefor we provided links to download the latest snapshots of them. As we update this page through the upcoming months, we will make those repositories public and provide more technical details and documentation.
 
 #### Changelog
 
@@ -33,7 +33,7 @@ TBA
 - [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-obzerver_ros-23e7d29fa8b3.tar.gz)
 - Snapshot commit hash: `23e7d29fa8b3`
 - SHA1: `a028eb811aa0bfa1f342dba07eef820c6a18db76`
-- Note: Requires a version of ROS [visio_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
+- Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
 
 ##### "bebop_autonomy": ROS driver for Parrot Bebop Drone 
 
@@ -69,7 +69,7 @@ TBA
 
 - [Git repository](https://github.com/AutonomyLab/autonomy_hri/tree/dev/autonomy_human)
 - Branch/version: `dev`
-- Note: Requires a version of ROS [visio_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
+- Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
 
 ##### "bebop_hri": The behavior generator code for the paper
 
