@@ -30,4 +30,4 @@ $ rostopic echo -p /topic/name > filename.csv
 Tool for visualizing the robot speed based on ground-truth (vicon data) for seeing the velocity controller output visualy.
 In ``vel`` folder, ``process_bag.sh`` process the bags using ``post_process.py``, creates a temporary bag, extracts the vicon data and bebop speed from temporary bag, and deletes the temp bag.
 ``process_bag.sh`` also gets two arguments same as previous ones, first argument is the path to folder containing all the bags that should be proccessed, second argument is the path to destination folder for saving all the CSV files.
-Then using ``all_tests.m`` Matlab script, draws the speed profile for all the CSV files that are in the same folder as the script.
+Then using ``all_tests.m`` Matlab script, draws the speed profile for all the CSV files that are in the same folder as the script. (!!! Messy code, should update the way it reads all the files like other scripes from a ```files.txt``` not eveything from the folder as is right now !!!)
