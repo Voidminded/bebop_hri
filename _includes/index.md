@@ -48,9 +48,8 @@ TBA
 
 ##### "bebop_vel_ctrl": Velocity controller for Parrot Bebop Drone (ROS package)
 
-- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-bebop_vel_ctrl-4962f392b33c.tar.gz)
-- Snapshot commit hash: `4962f392b33c`
-- SHA1: `f9f95f75af1efed9da1ca08e3ad06c24081276d9`
+- <i class="fa fa-github"></i>&nbsp;[Git repository](https://github.com/AutonomyLab/bebop_vel_ctrl)
+- IROS'16 commit hash: `4962f392b33c`
 
 ##### "bebop_vservo": Visual servo controller for Parrot Bebop Drone (ROS package)
 
