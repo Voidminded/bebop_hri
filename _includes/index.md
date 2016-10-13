@@ -1,12 +1,13 @@
 ### Introduction
 
-This page provides supplementary materials for the following paper, submitted to [2016 IEEE/RSJ International Conference on Intelligent Robots and Systems](http://www.iros2016.org/) (IROS 2016).
+This page provides supplementary materials for the following paper, presented in [2016 IEEE/RSJ International Conference on Intelligent Robots and Systems](http://www.iros2016.org/) (IROS 2016).
 
-- Title: **"UAV, Come To Me: End-to-End, Multi-Scale Situated HRI with an Uninstrumented Human and a Distant UAV"**
-- Authors: [Mani Monajjemi](https://mani.im), [Sepehr Mohaimenianpour](http://sepehr.im) and [Richard Vaughan](https://www.cs.sfu.ca/~vaughan/)
-- Affiliation: [AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca)
 
-**Important Note**: A few of the source code repositories are not made public yet, therefor we have provided links to download the latest snapshots of them. As we update this page, we will make those repositories public and provide more technical details and documentation.
+<p class="message">
+**"UAV, Come To Me: End-to-End, Multi-Scale Situated HRI with an Uninstrumented Human and a Distant UAV"**
+[Mani Monajjemi](https://mani.im), [Sepehr Mohaimenianpour](http://sepehr.im) and [Richard Vaughan](https://www.cs.sfu.ca/~vaughan/)
+_[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca)_
+</p>
 
 #### Changelog
 
@@ -35,7 +36,7 @@ TBA
 - SHA1: `a028eb811aa0bfa1f342dba07eef820c6a18db76`
 - Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
 
-##### "bebop_autonomy": ROS driver for Parrot Bebop Drone 
+##### "bebop_autonomy": ROS driver for Parrot Bebop Drone
 
 - [Git repository](https://github.com/AutonomyLab/bebop_autonomy)
 - Branch/version: `0.4.1`
