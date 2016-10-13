@@ -36,9 +36,8 @@ TBA
 
 ##### "obzerver_ros": The ROS binding for "obzerver"
 
-- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-obzerver_ros-23e7d29fa8b3.tar.gz)
-- Snapshot commit hash: `23e7d29fa8b3`
-- SHA1: `a028eb811aa0bfa1f342dba07eef820c6a18db76`
+- <i class="fa fa-github"></i>&nbsp;[Git repository](https://github.com/AutonomyLab/obzerver_ros)
+- IROS'16 commit hash: `23e7d29fa8b3`
 - Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
 
 ##### "bebop_autonomy": ROS driver for Parrot Bebop Drone
@@ -72,4 +71,4 @@ TBA
 
 - [Git repository](https://github.com/AutonomyLab/autonomy_hri/tree/dev/autonomy_human)
 - Branch/version: `dev`
-- Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
+- Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g. [our fork](https://github.com/AutonomyLab/vision_opencv))
