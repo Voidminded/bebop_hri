@@ -21,16 +21,16 @@ _[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca
 
 TBA
 
-#### Souce Code
+#### Source Code
 
 ##### "bebop_hri": The behavior generator code, configurations and launch files for the paper (ROS package)
 
-- <i class="fa fa-github"></i>&nbsp;<a href="https://github.com/AutonomyLab/bebop_hri">Git Repository</a>
+- <i class="fa fa-github"></i>&nbsp;[Git Repository](https://github.com/AutonomyLab/bebop_hri)<a href=""></a>
 - IROS'16 commit hash: `2ea50ade4e88`
 
 ##### "obzerver": Periodic Salient Object Detector
 
-- [Git repository](https://github.com/AutonomyLab/obzerver)
+- <i class="fa fa-github"></i>&nbsp;[Git repository](https://github.com/AutonomyLab/obzerver)
 - Branch/version: `opencv-3.0`
 - Note: Requires OpenCV 3.x
 
@@ -43,8 +43,8 @@ TBA
 
 ##### "bebop_autonomy": ROS driver for Parrot Bebop Drone
 
-- [Git repository](https://github.com/AutonomyLab/bebop_autonomy)
-- Branch/version: `0.4.1`
+- <i class="fa fa-github"></i>&nbsp;[Git repository](https://github.com/AutonomyLab/bebop_autonomy)
+- IROS'16 version: `0.4.1`
 
 ##### "bebop_vel_ctrl": Velocity controller for Parrot Bebop Drone (ROS package)
 
