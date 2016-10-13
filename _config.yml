@@ -2,7 +2,7 @@
 permalink:           pretty
 
 # Setup
-title:               End-To-End Human-Flying Robot Interactions
+title:               End-To-End Human-Flying Robot Interaction
 tagline:             Supplementary materials for "UAV, Come To Me; End-to-End, Multi-Scale Situated HRI with an Uninstrumented Human and a Distant UAV" paper (IROS 2016)
 url:                 http://autonomylab.org
 paginate:            1
