@@ -8,7 +8,7 @@ _[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca
 
 <i class="fa fa-file-text-o"></i>&nbsp;<a href="#">BIB</a>&nbsp;
 <i class="fa fa-file-pdf-o"></i>&nbsp;<a href="https://autonomylab.github.io/doc/monajjemi_iros16.pdf">PDF</a>
-<i class="fa fa-github"></i>&nbsp;<a href="#souce-code"">Code</a>
+<i class="fa fa-github"></i>&nbsp;<a href="#source-code">Code</a>
 
 <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/6kKuGH0B8XY?rel=0" frameborder="0" allowfullscreen></iframe>
 
@@ -22,6 +22,11 @@ _[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca
 TBA
 
 #### Souce Code
+
+##### "bebop_hri": The behavior generator code, configurations and launch files for the paper (ROS package)
+
+- <i class="fa fa-github"></i>&nbsp;<a href="https://github.com/AutonomyLab/bebop_hri">Git Repository</a>
+- IROS'16 commit hash: `2ea50ade4e88`
 
 ##### "obzerver": Periodic Salient Object Detector
 
@@ -71,9 +76,3 @@ TBA
 - [Git repository](https://github.com/AutonomyLab/autonomy_hri/tree/dev/autonomy_human)
 - Branch/version: `dev`
 - Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g [our fork](https://github.com/AutonomyLab/vision_opencv))
-
-##### "bebop_hri": The behavior generator code for the paper
-
-- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-bebop_hri-2ea50ade4e88.tar.gz)
-- Snapshot commit hash: `2ea50ade4e88`
-- SHA1: `45565286448428879fa46795f6cefa7163c1b8eb`
