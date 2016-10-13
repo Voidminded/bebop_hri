@@ -58,15 +58,14 @@ TBA
 
 ##### "autonomy_leds": Firmware and animation engine for DotStar LED strips (ROS package)
 
-- [Git repository](https://github.com/AutonomyLab/autonomy_leds)
+- <i class="fa fa-github"></i>&nbsp; [Git repository](https://github.com/AutonomyLab/autonomy_leds)
 - Branch/version (firmware): `cjmcu_beetle`
 - Branch/version (engine): `dev`
 
 ##### "cftld_ros": ROS wrapper for CFTld, a long-term visual tracker
 
-- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-cftld_ros-68eb0b0774ae.tar.gz)
-- Snapshot commit hash: `378029e2b0eb0c61c555710838844cd13e026aab`
-- SHA1: `378029e2b0eb0c61c555710838844cd13e026aab`
+- <i class="fa fa-github"></i>&nbsp;[Git repository](https://github.com/AutonomyLab/cftld_ros)
+- IROS'16 commit hash: `378029e2b0eb0c61c555710838844cd13e026aab`
 - Based on [CFTld tracker](https://github.com/klahaag/CFtld)
 
 ##### "autonomy_human": Short-range Face Engagement and Optical Flow Based Gesture Detection
