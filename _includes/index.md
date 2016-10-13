@@ -6,6 +6,10 @@ This page provides supplementary materials for the following paper, presented in
 [Mani Monajjemi](https://mani.im), [Sepehr Mohaimenianpour](http://sepehr.im) and [Richard Vaughan](https://www.cs.sfu.ca/~vaughan/)<br />
 _[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca)_
 
+<i class="fa fa-file-text-o"></i>&nbsp;<a href="#">BIB</a>&nbsp;
+<i class="fa fa-file-pdf-o"></i>&nbsp;<a href="https://autonomylab.github.io/doc/monajjemi_iros16.pdf">PDF</a>
+<i class="fa fa-github"></i>&nbsp;<a href="#">Code</a>
+
 <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/6kKuGH0B8XY?rel=0" frameborder="0" allowfullscreen></iframe>
 
 #### Changelog
