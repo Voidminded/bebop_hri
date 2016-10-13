@@ -2,10 +2,11 @@
 
 This page provides supplementary materials for the following paper, presented in [2016 IEEE/RSJ International Conference on Intelligent Robots and Systems](http://www.iros2016.org/) (IROS 2016).
 
-
 **"UAV, Come To Me: End-to-End, Multi-Scale Situated HRI with an Uninstrumented Human and a Distant UAV"**<br />
 [Mani Monajjemi](https://mani.im), [Sepehr Mohaimenianpour](http://sepehr.im) and [Richard Vaughan](https://www.cs.sfu.ca/~vaughan/)<br />
 _[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca)_
+
+<iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/6kKuGH0B8XY?rel=0" frameborder="0" allowfullscreen></iframe>
 
 #### Changelog
 
