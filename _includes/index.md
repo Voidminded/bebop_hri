@@ -53,9 +53,8 @@ TBA
 
 ##### "bebop_vservo": Visual servo controller for Parrot Bebop Drone (ROS package)
 
-- [Download URL](https://github.com/AutonomyLab/bebop_hri/releases/download/iros16_submission/AutonomyLab-bebop_vservo-f25bfaaf74d0.tar.gz)
-- Snapshot commit hash: `f25bfaaf74d0`
-- SHA1: `161dbda80075720f07936241b0d8780e3caab41e`
+- <i class="fa fa-github"></i>&nbsp;[Git repository](https://github.com/AutonomyLab/bebop_vservo)
+- IROS'16 commit hash: `f25bfaaf74d0`
 
 ##### "autonomy_leds": Firmware and animation engine for DotStar LED strips (ROS package)
 
