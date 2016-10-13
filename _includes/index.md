@@ -8,19 +8,16 @@ _[AutonomyLab](http://autonomylab.org/), [Simon Fraser University](http://sfu.ca
 
 <i class="fa fa-file-text-o"></i>&nbsp;<a href="#">BIB</a>&nbsp;
 <i class="fa fa-file-pdf-o"></i>&nbsp;<a href="https://autonomylab.github.io/doc/monajjemi_iros16.pdf">PDF</a>
-<i class="fa fa-github"></i>&nbsp;<a href="#">Code</a>
+<i class="fa fa-github"></i>&nbsp;<a href="#souce-code"">Code</a>
 
 <iframe width="560" height="315" src="https://www.youtube-nocookie.com/embed/6kKuGH0B8XY?rel=0" frameborder="0" allowfullscreen></iframe>
 
 #### Changelog
 
+- Oct 12, 2016: Updated webpage to include the paper and all source repositories
 - Mar 14, 2016: Initial webpage and source code release
 
-#### Video
-
-TBA
-
-#### Paper
+#### Documentation
 
 TBA
 
