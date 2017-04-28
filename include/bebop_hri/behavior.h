@@ -9,6 +9,7 @@
 #include <std_msgs/Bool.h>
 #include <autonomy_leds_msgs/Feedback.h>
 #include <map>
+#include <yolo2/ImageDetections.h>
 
 // This is a placeholder for obzerver
 #include <image_geometry/pinhole_camera_model.h>
@@ -49,6 +50,7 @@ enum bebop_mode_t
   MODE_CLOSERANGE_LOST = 10,
   MODE_MANUAL = 11,
   MODE_BAD_VIDEO = 12,
+  MODE_SEPEHR_HANDS = 13,
   MODE_NUM
 };
 
@@ -137,14 +139,25 @@ protected:
   behavior_tools::ASyncSub<obzerver_ros::Tracks> sub_all_tracks_;
 
   behavior_tools::ASyncSub<cftld_ros::Track> sub_visual_tracker_track_;
+  behavior_tools::ASyncSub<cftld_ros::Track> sub_right_hand_tracker_;
+  behavior_tools::ASyncSub<cftld_ros::Track> sub_left_hand_tracker_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAttitudeChanged> sub_bebop_att_;
   behavior_tools::ASyncSub<bebop_msgs::Ardrone3PilotingStateAltitudeChanged> sub_bebop_alt_;
   behavior_tools::ASyncSub<sensor_msgs::CameraInfo> sub_camera_info_;
   behavior_tools::ASyncSub<autonomy_human::human> sub_human_;
+  behavior_tools::ASyncSub<yolo2::ImageDetections> sub_yolo_;
 
   // To reset/initialize the visualal tracker
   ros::Publisher pub_cftld_tracker_reset_;
   ros::Publisher pub_cftld_tracker_init_;
+
+  // To reset/initialize the visualal tracker for right hand
+  ros::Publisher pub_cftld_right_hand_reset_;
+  ros::Publisher pub_cftld_right_hand_init_;
+
+  // To reset/initialize the visualal tracker for left hand
+  ros::Publisher pub_cftld_left_hand_reset_;
+  ros::Publisher pub_cftld_left_hand_init_;
 
   // To enable/disable visual servo
   ros::Publisher pub_visual_servo_enable_;
@@ -155,6 +168,9 @@ protected:
 
   // To enable/disable autonomy_human
   ros::Publisher pub_human_enable_;
+
+  // To enable/disable YOLO
+  ros::Publisher pub_yolo_enable_;
 
   // To move the camera
   ros::Publisher pub_bebop_camera_;
@@ -193,6 +209,8 @@ protected:
   constants::gesture_states_t gesture_prev_;
   double flow_left_median_;
   double flow_right_median_;
+  int visual_joy_x_offset;
+  int visual_joy_y_offset;
   uint32_t gest_left_counter_;
   uint32_t gest_right_counter_;
   uint32_t gesture_both_counter_;
@@ -231,7 +249,7 @@ protected:
 
 
   void ToggleAutonomyHuman(const bool enable);
-
+  void ToggleYolo( const bool enable);
   void MoveBebopCamera(const double& pan_deg, const double& tilt_deg);
   void BebopFlip(const uint8_t flip_type);
   void BebopSnapshot();

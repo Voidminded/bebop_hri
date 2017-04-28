@@ -21,16 +21,24 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     sub_periodic_tracks_(nh_, "obzerver/tracks/periodic", 10),
     sub_all_tracks_(nh_, "obzerver/tracks/all", 10),
     sub_visual_tracker_track_(nh_, "visual_tracker_track", 1),
+    sub_right_hand_tracker_(nh_, "gesture/right_hand/cftld/track", 1),
+    sub_left_hand_tracker_(nh_, "gesture/left_hand/cftld/track", 1),
     sub_bebop_att_(nh_, "bebop/states/ardrone3/PilotingState/AttitudeChanged", 10),
     sub_bebop_alt_(nh_, "bebop/states/ardrone3/PilotingState/AltitudeChanged", 10),
     sub_camera_info_(nh_, "bebop/camera_info", 1),
     sub_human_(nh, "human/human", 10),
+    sub_yolo_(nh_, "yolo2/detections", 1),
     pub_cftld_tracker_reset_(nh_.advertise<std_msgs::Empty>("visual_tracker_reset", 1, true)),
     pub_cftld_tracker_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("visual_tracker_init", 1, true)),
     pub_visual_servo_enable_(nh_.advertise<std_msgs::Bool>("visual_servo_enable", 1, true)),
+    pub_cftld_right_hand_reset_(nh_.advertise<std_msgs::Empty>("gesture/right_hand/cftld/reset" , 1)),
+    pub_cftld_right_hand_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("gesture/right_hand/cftld/init_roi", 1)),
+    pub_cftld_left_hand_reset_(nh_.advertise<std_msgs::Empty>("gesture/left_hand/cftld/reset" , 1)),
+    pub_cftld_left_hand_init_(nh_.advertise<sensor_msgs::RegionOfInterest>("gesture/left_hand/cftld/init_roi", 1)),
     pub_visual_servo_target_(nh_.advertise<bebop_vservo::Target>("visual_servo_target", 1, true)),
     pub_obzerver_init_(nh_.advertise<obzerver_ros::Init>("obzerver/enable", 1, true)),
     pub_human_enable_(nh_.advertise<std_msgs::Bool>("human/enable", 1, true)),
+    pub_yolo_enable_(nh_.advertise<std_msgs::Bool>("yolo2/enable", 1, true)),
     pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
     pub_bebop_flip_(nh_.advertise<std_msgs::UInt8>("bebop/flip", 1, false)),
     pub_bebop_snapshot_(nh_.advertise<std_msgs::Empty>("bebop/snapshot", 1, false)),
@@ -93,6 +101,12 @@ void BebopBehaviorNode::ResetGestures()
   gest_left_counter_ = 0;
   gest_right_counter_ = 0;
   gesture_both_counter_ = 0;
+
+  //Sepehr's advance gesture
+  pub_cftld_right_hand_reset_.publish(msg_empty_);
+  pub_cftld_left_hand_reset_.publish(msg_empty_);
+  visual_joy_x_offset = 0;
+  visual_joy_y_offset = 0;
 }
 
 void BebopBehaviorNode::ResetVisualTracker()
@@ -107,6 +121,7 @@ void BebopBehaviorNode::Reset()
   ToggleVisualServo(false);
   ToggleObzerver(false);
   ToggleAutonomyHuman(false);
+
   ResetGestures();
 }
 
@@ -140,6 +155,13 @@ void BebopBehaviorNode::ToggleAutonomyHuman(const bool enable)
   std_msgs::Bool bool_msg;
   bool_msg.data = enable;
   pub_human_enable_.publish(bool_msg);
+}
+
+void BebopBehaviorNode::ToggleYolo(const bool enable)
+{
+  std_msgs::Bool bool_msg;
+  bool_msg.data = enable;
+  pub_yolo_enable_.publish(bool_msg);
 }
 
 void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &tilt_deg)
@@ -302,6 +324,7 @@ void BebopBehaviorNode::UpdateBehavior()
   sub_bebop_att_.DeactivateIfOlderThan(1.0);
   sub_bebop_alt_.DeactivateIfOlderThan(1.0);
   sub_human_.DeactivateIfOlderThan(1.0);
+  sub_yolo_.DeactivateIfOlderThan(0.3);
   // The tolerance on camera_info_sub is lower
   sub_camera_info_.DeactivateIfOlderThan(0.5);
 
@@ -331,6 +354,11 @@ void BebopBehaviorNode::UpdateBehavior()
 
   switch (bebop_mode_)
   {
+  case constants::MODE_SEPEHR_HANDS:
+  {
+
+    break;
+  }
   case constants::MODE_IDLE:
   {
     if (is_transition)
@@ -356,6 +384,8 @@ void BebopBehaviorNode::UpdateBehavior()
       // perfrom searching
       if (bebop_mode_ == constants::MODE_IDLE)
       {
+//        ToggleAutonomyHuman(true);
+//        Transition(constants::MODE_CLOSERANGE_ENGAGED);
         Transition(constants::MODE_SEARCHING);
       }
 
@@ -792,6 +822,11 @@ void BebopBehaviorNode::UpdateBehavior()
       msg_vservo_target_.target_width_m = 0.2;
 
       msg_vservo_target_.roi = h.faceROI;
+      msg_vservo_target_.roi.x_offset += visual_joy_x_offset;
+      msg_vservo_target_.roi.y_offset += visual_joy_y_offset;
+      if( abs(visual_joy_x_offset) > 10 || abs(visual_joy_y_offset) > 10)
+        msg_vservo_target_.reinit = true;
+//      ROS_WARN_STREAM(" X: " << h.faceROI.x_offset << " --> " << h.faceROI.x_offset + visual_joy_x_offset << "  Y: " << h.faceROI.y_offset << " --> " << h.faceROI.y_offset + visual_joy_y_offset);
       // vservo node will cache this value on its first call or when reinit=true
       // ignores it all other time
       msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
@@ -802,6 +837,61 @@ void BebopBehaviorNode::UpdateBehavior()
 
 
       if (param_enable_camera_control_) ControlBebopCamera();
+
+      // Advanced gesture
+      if( (sub_left_hand_tracker_.IsActive()
+          && sub_left_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
+        || (sub_right_hand_tracker_.IsActive()
+          && sub_right_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
+          || !sub_left_hand_tracker_.IsActive()
+          || !sub_right_hand_tracker_.IsActive())
+      {
+        ToggleYolo(true);
+        if( sub_yolo_.IsActive()
+            && sub_human_.IsActive())
+        {
+          yolo2::ImageDetections d = sub_yolo_.GetMsgCopy();
+          autonomy_human::human h = sub_human_.GetMsgCopy();
+          for( int i = 0; i < d.detections.size(); i++)
+          {
+            if( (!sub_left_hand_tracker_.IsActive()
+                || ( sub_left_hand_tracker_.IsActive()
+                     && ( sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+                          || sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)))
+                && d.detections[i].roi.x_offset >= h.leftHROI.x_offset
+                && d.detections[i].roi.x_offset < (h.leftHROI.x_offset + h.leftHROI.width)
+                && d.detections[i].roi.y_offset >= h.leftHROI.y_offset
+                && d.detections[i].roi.y_offset < (h.leftHROI.y_offset + h.leftHROI.height))
+            {
+              pub_cftld_left_hand_init_.publish( d.detections[i].roi);
+            }
+            if( (!sub_right_hand_tracker_.IsActive()
+                || ( sub_right_hand_tracker_.IsActive()
+                     && ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+                          || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)))
+                && d.detections[i].roi.x_offset >= h.rightHROI.x_offset
+                && d.detections[i].roi.x_offset < (h.rightHROI.x_offset + h.rightHROI.width)
+                && d.detections[i].roi.y_offset >= h.rightHROI.y_offset
+                && d.detections[i].roi.y_offset < (h.rightHROI.y_offset + h.rightHROI.height))
+            {
+              pub_cftld_right_hand_init_.publish( d.detections[i].roi);
+            }
+          }
+        }
+      }
+      else
+      {
+        ToggleYolo(false);
+        cftld_ros::Track r = sub_right_hand_tracker_.GetMsgCopy();
+        cftld_ros::Track l = sub_left_hand_tracker_.GetMsgCopy();
+        autonomy_human::human h = sub_human_.GetMsgCopy();
+        int lx = (h.faceROI.x_offset + h.faceROI.width/2) - (l.roi.x_offset + l.roi.width/2);
+        int ly = (h.faceROI.y_offset + h.faceROI.height/2) - (l.roi.y_offset + l.roi.height/2);
+        int rx = (r.roi.x_offset + r.roi.width/2) - (h.faceROI.x_offset + h.faceROI.width/2);
+        int ry = (h.faceROI.y_offset + h.faceROI.height/2) - (r.roi.y_offset + r.roi.height/2);
+        visual_joy_x_offset = (rx - lx)/2;
+        visual_joy_y_offset = (ry - ly)/2;
+      }
 
       // Gesture && Feedback
       flow_left_vec_.push_front(h.flowScore[0]);

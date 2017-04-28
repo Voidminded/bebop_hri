@@ -12,6 +12,7 @@
   <arg name="use_human" default="true" />
   <arg name="behavior_param_file" default="$(find bebop_hri)/config/behavior.yaml" />
   <arg name="drone_type" default="bebop2" /> <!-- available drone types: bebop1, bebop2 -->
+  <arg name="advanced_close_range" default="true" />
 
   <group unless="$(arg is_bag)">
     <rosparam command="load" file="$(find bebop_hri)/config/bebop.yaml" />
@@ -94,7 +95,7 @@
   </group>
 
   <group unless="$(arg use_cftld)">
-    <node name="fake_tracker" type="fake_tracker_node" pkg="cftld_ros" output="log">
+    <node name="fake_tracker" type="fake_tracker_   node" pkg="cftld_ros" output="log">
       <remap from="roi" to="rqt_image_view/clicked_roi" />
       <remap from="track" to="cftld/track" />
     </node>
@@ -108,6 +109,31 @@
       <arg name="debug_mode" value="18" />
       <arg name="start_paused" value="true" />
     </include>
+    <group if="$(arg advanced_close_range)">
+      <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" output="screen"/>
+      <node pkg="cftld_ros" type="cftld_ros_node" name="cftld_ros_right_hand_nodelet" output="screen" respawn="true">
+        <remap from="image_raw" to="bebop/image_raw" />
+        <remap from="init_roi" to="gesture/right_hand/cftld/init_roi" />
+        <remap from="reset" to="gesture/right_hand/cftld/reset" />
+        <remap from="track" to="gesture/right_hand/cftld/track" />
+        <remap from="debug_image" to="gesture/right_hand/cftld/debug_image_raw" />
+        <param name="tld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
+        <rosparam command="load" file="$(find cftld_ros)/config/default.yaml" />
+      </node>
+      <node pkg="cftld_ros" type="cftld_ros_node" name="cftld_ros_left_hand_nodelet" output="screen" respawn="true">
+        <remap from="image_raw" to="bebop/image_raw" />
+        <remap from="init_roi" to="gesture/left_hand/cftld/init_roi" />
+        <remap from="reset" to="gesture/left_hand/cftld/reset" />
+        <remap from="track" to="gesture/left_hand/cftld/track" />
+        <remap from="debug_image" to="gesture/left_hand/cftld/debug_image_raw" />
+        <param name="tld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
+        <rosparam command="load" file="$(find cftld_ros)/config/default.yaml" />
+      </node>
+      <node pkg="nodelet" type="nodelet" name="yolo2" args="load yolo2/Yolo2Nodelet nodelet_manager" output="screen" respawn="true">
+        <param name="confidence" value="0.5" />
+        <param name="nms" value="0.4" />
+      </node>
+    </group>
   </group>
 
   <group if="$(arg use_vicon)">

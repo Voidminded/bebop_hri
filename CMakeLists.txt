@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
   obzerver_ros
   autonomy_leds_msgs
   autonomy_human
+  yolo2
 )
 
 
