@@ -21,4 +21,8 @@ topics:
   topic   : joy/cmd_vel
   timeout : 0.5
   priority: 100
-
+-
+  name    : visual_joy
+  topic   : visual_joy/cmd_vel
+  timeout : 0.1
+  priority: 99

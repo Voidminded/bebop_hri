@@ -41,8 +41,11 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_yolo_enable_(nh_.advertise<std_msgs::Bool>("yolo2/enable", 1, true)),
     pub_bebop_camera_(nh_.advertise<geometry_msgs::Twist>("bebop/camera_control", 1, true)),
     pub_bebop_flip_(nh_.advertise<std_msgs::UInt8>("bebop/flip", 1, false)),
+    pub_bebop_take_off_(nh_.advertise<std_msgs::Empty>("bebop/takeoff", 10, false)),
+    pub_bebop_land_(nh_.advertise<std_msgs::Empty>("bebop/land", 10, false)),
     pub_bebop_snapshot_(nh_.advertise<std_msgs::Empty>("bebop/snapshot", 1, false)),
     pub_bebop_abs_vel_(nh_.advertise<geometry_msgs::Twist>("abs_vel_ctrl/setpoint/cmd_vel", 10, false)),
+    pub_visual_joy_cmd_vel_(nh_.advertise<geometry_msgs::Twist>("visual_joy/cmd_vel", 10, false)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_NUM),
     bebop_mode_prev_(constants::MODE_NUM),
@@ -166,11 +169,11 @@ void BebopBehaviorNode::ToggleYolo(const bool enable)
 
 void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &tilt_deg)
 {
-  if (!param_enable_camera_control_)
-  {
-    ROS_ERROR_ONCE("[BEH] Camera control is disabled");
-    return;
-  }
+//  if (!param_enable_camera_control_)
+//  {
+//    ROS_ERROR_ONCE("[BEH] Camera control is disabled");
+//    return;
+//  }
 
   ROS_DEBUG_STREAM("[BEH] Request to move Bebop's camera to " << tilt_deg);
   geometry_msgs::Twist twist;
@@ -204,22 +207,25 @@ void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
 
 void BebopBehaviorNode::BebopSnapshot()
 {
-  ROS_WARN("[BEH] Taking a snapshot ...");
+  ROS_WARN("[BEH] ing a snapshot ...");
   std_msgs::Empty empty_msg;
   pub_bebop_snapshot_.publish(empty_msg);
 }
 
 void BebopBehaviorNode::ControlBebopCamera()
 {
+//  ROS_ERROR("CAMERAAAAAAAAAAAAA !!!!!!!!");
   if (sub_bebop_alt_.IsActive())
   {
     const double& alt_target = param_target_height_/2.0 + param_target_dist_ground_;
     //const double& tilt = (sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target);
-    const double& tilt = pow((sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target), 0.33);
-    ROS_DEBUG_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
-                             << " alt_bebop: " << sub_bebop_alt_()->altitude
-                             << " tilt_rel: " << tilt);
-    MoveBebopCamera(0.0, -CLAMP(tilt, 0.0, 1.0) * param_max_camera_tilt_deg_);
+//    const double& tilt = pow((sub_bebop_alt_()->altitude - alt_target) / (param_search_alt_ - alt_target), 0.33);
+    const double& tilt = -(17.0/2.0)*sub_bebop_alt_()->altitude+17.0;
+//    ROS_INFO_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
+//                             << " alt_bebop: " << sub_bebop_alt_()->altitude
+//                             << " tilt_rel: " << tilt);
+//    MoveBebopCamera(0.0, -CLAMP(tilt, 0.0, 1.0) * param_max_camera_tilt_deg_);
+    MoveBebopCamera(0.0, tilt);
   }
 }
 
@@ -352,6 +358,8 @@ void BebopBehaviorNode::UpdateBehavior()
     return;
   }
 
+
+  ControlBebopCamera();
   switch (bebop_mode_)
   {
   case constants::MODE_SEPEHR_HANDS:
@@ -361,6 +369,9 @@ void BebopBehaviorNode::UpdateBehavior()
   }
   case constants::MODE_IDLE:
   {
+    ToggleAutonomyHuman(true);
+    Transition(constants::MODE_CLOSERANGE_ENGAGED);
+    break;
     if (is_transition)
     {
       Reset();
@@ -384,9 +395,9 @@ void BebopBehaviorNode::UpdateBehavior()
       // perfrom searching
       if (bebop_mode_ == constants::MODE_IDLE)
       {
-//        ToggleAutonomyHuman(true);
-//        Transition(constants::MODE_CLOSERANGE_ENGAGED);
-        Transition(constants::MODE_SEARCHING);
+        ToggleAutonomyHuman(true);
+        Transition(constants::MODE_CLOSERANGE_ENGAGED);
+//        Transition(constants::MODE_SEARCHING);
       }
 
       ROS_INFO_STREAM("[BEH] IDLE transition because of " << (manual_reset ? "Manual Reset" : "Timeout"));
@@ -822,11 +833,8 @@ void BebopBehaviorNode::UpdateBehavior()
       msg_vservo_target_.target_width_m = 0.2;
 
       msg_vservo_target_.roi = h.faceROI;
-      msg_vservo_target_.roi.x_offset += visual_joy_x_offset;
-      msg_vservo_target_.roi.y_offset += visual_joy_y_offset;
-      if( abs(visual_joy_x_offset) > 10 || abs(visual_joy_y_offset) > 10)
-        msg_vservo_target_.reinit = true;
-//      ROS_WARN_STREAM(" X: " << h.faceROI.x_offset << " --> " << h.faceROI.x_offset + visual_joy_x_offset << "  Y: " << h.faceROI.y_offset << " --> " << h.faceROI.y_offset + visual_joy_y_offset);
+
+      ROS_WARN_STREAM_THROTTLE( 1.0, " X: " << visual_joy_x_offset << "  Y: " << visual_joy_y_offset);
       // vservo node will cache this value on its first call or when reinit=true
       // ignores it all other time
       msg_vservo_target_.desired_yaw_rad = -sub_bebop_att_()->yaw;
@@ -834,10 +842,20 @@ void BebopBehaviorNode::UpdateBehavior()
       ROS_DEBUG_STREAM_THROTTLE(0.5, "[BEH] CLOSE RANGE SERVO: " <<
                h.faceROI.x_offset << " " << h.faceROI.y_offset << " " << h.faceROI.width << " " << h.faceROI.height);
       pub_visual_servo_target_.publish(msg_vservo_target_);
+      bool gesture_feedback = false;
 
 
-      if (param_enable_camera_control_) ControlBebopCamera();
+//      if (param_enable_camera_control_)
+      ControlBebopCamera();
 
+      bool leftLost = (!sub_left_hand_tracker_.IsActive()
+                       || ( sub_left_hand_tracker_.IsActive()
+                            && ( sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+                                 || sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
+      bool rightLost = (!sub_right_hand_tracker_.IsActive()
+                        || ( sub_right_hand_tracker_.IsActive()
+                             && ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+                                  || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
       // Advanced gesture
       if( (sub_left_hand_tracker_.IsActive()
           && sub_left_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
@@ -881,7 +899,7 @@ void BebopBehaviorNode::UpdateBehavior()
       }
       else
       {
-        ToggleYolo(false);
+//        ToggleYolo(false);
         cftld_ros::Track r = sub_right_hand_tracker_.GetMsgCopy();
         cftld_ros::Track l = sub_left_hand_tracker_.GetMsgCopy();
         autonomy_human::human h = sub_human_.GetMsgCopy();
@@ -891,63 +909,97 @@ void BebopBehaviorNode::UpdateBehavior()
         int ry = (h.faceROI.y_offset + h.faceROI.height/2) - (r.roi.y_offset + r.roi.height/2);
         visual_joy_x_offset = (rx - lx)/2;
         visual_joy_y_offset = (ry - ly)/2;
+        geometry_msgs::Twist visual_joy_twist;
+        visual_joy_twist.angular.x = 0;
+        visual_joy_twist.angular.y = 0;
+        visual_joy_twist.angular.z = 0;
+        visual_joy_twist.linear.x = 0;
+        visual_joy_twist.linear.y = CLAMP(double(visual_joy_x_offset)/-10.0, -0.5, 0.5);
+        visual_joy_twist.linear.z = CLAMP(double(visual_joy_y_offset)/-10.0, -0.5, 0.5);
+        if( sub_bebop_alt_.IsActive()
+            && sub_bebop_alt_()->altitude < 0.05
+            && visual_joy_y_offset > 10)
+          pub_bebop_take_off_.publish( msg_empty_);
+        else if ( sub_bebop_alt_.IsActive()
+                  && sub_bebop_alt_()->altitude < 1.0
+                  && sub_bebop_alt_()->altitude > 0.3
+                  && visual_joy_y_offset < -10)
+          pub_bebop_land_.publish( msg_empty_);
+        else
+        {
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+        }
       }
-
-      // Gesture && Feedback
-      flow_left_vec_.push_front(h.flowScore[0]);
-      flow_right_vec_.push_front(h.flowScore[1]);
-      if (flow_left_vec_.size() > param_flow_queue_size_) flow_left_vec_.pop_back();
-      if (flow_right_vec_.size() > param_flow_queue_size_) flow_right_vec_.pop_back();
 
       ROS_ASSERT(sub_camera_info_()->width != 0);
       const int view_angle_ = -180.0 * (((double(h.faceROI.width / 2.0)+ h.faceROI.x_offset)
-                                        / sub_camera_info_()->width) - 0.5);
-      bool gesture_feedback = false;
-      if (GestureUpdate() && gesture_curr_ != constants::GESTURE_NONE)
+                                         / sub_camera_info_()->width) - 0.5);
+
+      if(leftLost || rightLost)
       {
-        ROS_ERROR_STREAM("[BEH Gesture Detected: " << GESTURE_STR(gesture_curr_));
-        if ((gesture_curr_ == constants::GESTURE_RIGHT_SWING) ||
-            (gesture_curr_ == constants::GESTURE_LEFT_SWING))
-        {
-          Transition(constants::MODE_CLOSERANGE_SINGLECOMMNAD);
-          break;
-        }
-        if (gesture_curr_ == constants::GESTURE_BOTH_SWING)
-        {
-          Transition(constants::MODE_CLOSERANGE_DOUBLECOMMNAD);
-          break;
-        }
+        gesture_feedback = true;
+        if(leftLost && rightLost)
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                     "red", "red", 10, view_angle_);
+        if(!leftLost && rightLost)
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                     "white", "red", 10, view_angle_);
+        if(leftLost && !rightLost)
+          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+                                     "red", "white", 10, view_angle_);
       }
-      else
-      {
-        if ((flow_left_median_ > 1.0 && flow_left_median_ > flow_right_median_))
-        {
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
-                                     "green", "white", 20, view_angle_);
-          gesture_feedback = true;
-        }
+//      // Gesture && Feedback
+//      flow_left_vec_.push_front(h.flowScore[0]);
+//      flow_right_vec_.push_front(h.flowScore[1]);
+//      if (flow_left_vec_.size() > param_flow_queue_size_) flow_left_vec_.pop_back();
+//      if (flow_right_vec_.size() > param_flow_queue_size_) flow_right_vec_.pop_back();
 
-        if ((flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_))
-        {
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
-                                     "white", "green", 20, view_angle_);
-          gesture_feedback = true;
-        }
-
-        if (flow_left_median_ > 1.0 && flow_right_median_ > 1.0 && fabs(flow_left_median_ - flow_left_median_) < 1.0)
-        {
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
-                                     "green", "green", 20, view_angle_);
-          gesture_feedback = true;
-        }
-
-//        if (flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_)
+//      if (GestureUpdate() && gesture_curr_ != constants::GESTURE_NONE)
+//      {
+//        ROS_ERROR_STREAM("[BEH Gesture Detected: " << GESTURE_STR(gesture_curr_));
+//        if ((gesture_curr_ == constants::GESTURE_RIGHT_SWING) ||
+//            (gesture_curr_ == constants::GESTURE_LEFT_SWING))
 //        {
-//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
-//                                     "white", "red", flow_right_median_ * 90, view_angle_);
+//          Transition(constants::MODE_CLOSERANGE_SINGLECOMMNAD);
+//          break;
+//        }
+//        if (gesture_curr_ == constants::GESTURE_BOTH_SWING)
+//        {
+//          Transition(constants::MODE_CLOSERANGE_DOUBLECOMMNAD);
+//          break;
+//        }
+//      }
+//      else
+//      {
+//        if ((flow_left_median_ > 1.0 && flow_left_median_ > flow_right_median_))
+//        {
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+//                                     "green", "white", 20, view_angle_);
 //          gesture_feedback = true;
 //        }
-      }
+
+//        if ((flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_))
+//        {
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+//                                     "white", "green", 20, view_angle_);
+//          gesture_feedback = true;
+//        }
+
+//        if (flow_left_median_ > 1.0 && flow_right_median_ > 1.0 && fabs(flow_left_median_ - flow_left_median_) < 1.0)
+//        {
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+//                                     "green", "green", 20, view_angle_);
+//          gesture_feedback = true;
+//        }
+
+////        if (flow_right_median_ > 1.0 && flow_right_median_ > flow_left_median_)
+////        {
+////          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_LOOK_AT,
+////                                     "white", "red", flow_right_median_ * 90, view_angle_);
+////          gesture_feedback = true;
+////        }
+//      }
 
       if (!gesture_feedback)
       {

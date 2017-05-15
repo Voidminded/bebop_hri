@@ -4,7 +4,7 @@
   <arg name="nodelets_output" default="log" />
   <arg name="is_bag" default="false" />
   <arg name="plot_servo" default="false" />
-  <arg name="obz_logfile" default="/local_home/iros16/outdoor/obz" />
+  <arg name="obz_logfile" default="/home/autolab/ros16/outdoor/obz" />
   <arg name="use_alvar" default="false" />
   <arg name="use_obzerver" default="true" />
   <arg name="use_cftld" default="true" /> <!-- or fake it? -->

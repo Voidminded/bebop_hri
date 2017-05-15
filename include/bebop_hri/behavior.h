@@ -172,9 +172,14 @@ protected:
   // To enable/disable YOLO
   ros::Publisher pub_yolo_enable_;
 
+  // To publish visual joystick velocity
+  ros::Publisher pub_visual_joy_cmd_vel_;
+
   // To move the camera
   ros::Publisher pub_bebop_camera_;
   ros::Publisher pub_bebop_flip_;
+  ros::Publisher pub_bebop_take_off_;
+  ros::Publisher pub_bebop_land_;
   ros::Publisher pub_bebop_snapshot_;
   ros::Publisher pub_bebop_abs_vel_;
 
