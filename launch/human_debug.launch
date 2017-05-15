@@ -2,6 +2,7 @@
 <launch>
   <arg name="is_bag" default="false" />
   <arg name="compressed" default="false" />
+  <arg name="usb_cam" default="false" />
   <arg name="obz_logfile" default="/tmp/obzerver_ros" />
   <arg name="joy_dev" default="/dev/input/js0" />
   <arg name="drone_type" default="bebop2" /> <!-- available drone types: bebop1, bebop2 -->
@@ -29,6 +30,8 @@
     <!-- republisher -->
     <node name="republish" pkg="image_transport" type="republish" args="compressed in:=bebop/image_raw raw out:=bebop/image_raw" output="screen" />
   </group>
+
+  <node if="$(arg usb_cam)" name="relyer" pkg="topic_tools" type="relay" args="/usb_cam/image_raw bebop/image_raw" output="screen" />
 
   <include file="$(find autonomy_human)/launch/autonomy_human.launch">
     <arg name="param_file" value="$(find bebop_hri)/config/autonomy_human.yaml" />

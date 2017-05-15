@@ -62,7 +62,9 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     gest_left_counter_(0.0),
     gest_right_counter_(0.0),
     gesture_both_counter_(0.0),
-    desired_search_inited_(false)
+    desired_search_inited_(false),
+    right_hand_pose_(constants::HAND_POSE_UNTRACKED),
+    left_hand_pose_(constants::HAND_POSE_UNTRACKED)
 {
   UpdateParams();
   Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
@@ -204,6 +206,7 @@ void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
   ft_msg.data = flip_type;
   pub_bebop_flip_.publish(ft_msg);
 }
+
 
 void BebopBehaviorNode::BebopSnapshot()
 {
@@ -856,6 +859,10 @@ void BebopBehaviorNode::UpdateBehavior()
                         || ( sub_right_hand_tracker_.IsActive()
                              && ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
                                   || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
+      if( leftLost)
+        left_hand_pose_ = constants::HAND_POSE_UNTRACKED;
+      if( rightLost)
+        right_hand_pose_ = constants::HAND_POSE_UNTRACKED;
       // Advanced gesture
       if( (sub_left_hand_tracker_.IsActive()
           && sub_left_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
@@ -903,33 +910,156 @@ void BebopBehaviorNode::UpdateBehavior()
         cftld_ros::Track r = sub_right_hand_tracker_.GetMsgCopy();
         cftld_ros::Track l = sub_left_hand_tracker_.GetMsgCopy();
         autonomy_human::human h = sub_human_.GetMsgCopy();
-        int lx = (h.faceROI.x_offset + h.faceROI.width/2) - (l.roi.x_offset + l.roi.width/2);
-        int ly = (h.faceROI.y_offset + h.faceROI.height/2) - (l.roi.y_offset + l.roi.height/2);
-        int rx = (r.roi.x_offset + r.roi.width/2) - (h.faceROI.x_offset + h.faceROI.width/2);
-        int ry = (h.faceROI.y_offset + h.faceROI.height/2) - (r.roi.y_offset + r.roi.height/2);
-        visual_joy_x_offset = (rx - lx)/2;
-        visual_joy_y_offset = (ry - ly)/2;
-        geometry_msgs::Twist visual_joy_twist;
-        visual_joy_twist.angular.x = 0;
-        visual_joy_twist.angular.y = 0;
-        visual_joy_twist.angular.z = 0;
-        visual_joy_twist.linear.x = 0;
-        visual_joy_twist.linear.y = CLAMP(double(visual_joy_x_offset)/-10.0, -0.5, 0.5);
-        visual_joy_twist.linear.z = CLAMP(double(visual_joy_y_offset)/-10.0, -0.5, 0.5);
-        if( sub_bebop_alt_.IsActive()
-            && sub_bebop_alt_()->altitude < 0.05
-            && visual_joy_y_offset > 10)
-          pub_bebop_take_off_.publish( msg_empty_);
-        else if ( sub_bebop_alt_.IsActive()
-                  && sub_bebop_alt_()->altitude < 1.0
-                  && sub_bebop_alt_()->altitude > 0.3
-                  && visual_joy_y_offset < -10)
-          pub_bebop_land_.publish( msg_empty_);
-        else
+
+        // Right hand position finder
+        if( (r.roi.x_offset + r.roi.width/2) > (h.rightHROI.x_offset + h.rightHROI.width) )
         {
+          right_hand_pose_ = constants::HAND_POSE_RIGHT;
+          ROS_INFO("[GST] R -> R");
+        }
+        else if( (r.roi.x_offset + r.roi.width/2) < (h.rightHROI.x_offset) )
+        {
+          right_hand_pose_ = constants::HAND_POSE_LEFT;
+          ROS_INFO("[GST] R -> L");
+        }
+        else if( (r.roi.y_offset + r.roi.height/2) < (h.rightHROI.y_offset) )
+        {
+          right_hand_pose_ = constants::HAND_POSE_TOP;
+          ROS_INFO("[GST] R -> U");
+        }
+        else if( (r.roi.y_offset + r.roi.height/2) > (h.rightHROI.y_offset + h.rightHROI.height) )
+        {
+          right_hand_pose_ = constants::HAND_POSE_TOP;
+          ROS_INFO("[GST] R -> D");
+        }
+        else
+          right_hand_pose_ = constants::HAND_POSE_INSIDE;
+
+        // Left hand position finder
+        if( (l.roi.x_offset + l.roi.width/2) > (h.leftHROI.x_offset + h.leftHROI.width) )
+        {
+          left_hand_pose_ = constants::HAND_POSE_RIGHT;
+          ROS_INFO("[GST] L -> R");
+        }
+        else if( (l.roi.x_offset + l.roi.width/2) < (h.leftHROI.x_offset) )
+        {
+          left_hand_pose_ = constants::HAND_POSE_LEFT;
+          ROS_INFO("[GST] L -> L");
+        }
+        else if( (l.roi.y_offset + l.roi.height/2) < (h.leftHROI.y_offset) )
+        {
+          left_hand_pose_ = constants::HAND_POSE_TOP;
+          ROS_INFO("[GST] L -> U");
+        }
+        else if( (l.roi.y_offset + l.roi.height/2) > (h.leftHROI.y_offset + h.leftHROI.height) )
+        {
+          left_hand_pose_ = constants::HAND_POSE_TOP;
+          ROS_INFO("[GST] L -> D");
+        }
+        else
+          left_hand_pose_ = constants::HAND_POSE_INSIDE;
+
+        if( left_hand_pose_ == constants::HAND_POSE_DOWN
+            && right_hand_pose_ == constants::HAND_POSE_DOWN)
+        {
+          pub_bebop_land_.publish( msg_empty_);
+        }
+        else if( left_hand_pose_ == constants::HAND_POSE_TOP
+                 && right_hand_pose_ == constants::HAND_POSE_TOP)
+        {
+          pub_bebop_take_off_.publish( msg_empty_);
+        }
+        else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
+                 && right_hand_pose_ == constants::HAND_POSE_RIGHT)
+        {
+          geometry_msgs::Twist visual_joy_twist;
+          visual_joy_twist.angular.x = 0.0;
+          visual_joy_twist.angular.y = 0.0;
+          visual_joy_twist.angular.z = 0.0;
+          visual_joy_twist.linear.x = 0.0;
+          visual_joy_twist.linear.y = -0.1;
+          visual_joy_twist.linear.z = 0.0;
           ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
           pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
         }
+        else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
+                 && right_hand_pose_ == constants::HAND_POSE_TOP)
+        {
+          geometry_msgs::Twist visual_joy_twist;
+          visual_joy_twist.angular.x = 0.0;
+          visual_joy_twist.angular.y = 0.0;
+          visual_joy_twist.angular.z = 0.0;
+          visual_joy_twist.linear.x = 0.0;
+          visual_joy_twist.linear.y = 0.0;
+          visual_joy_twist.linear.z = 0.1;
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+        }
+        else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
+                 && right_hand_pose_ == constants::HAND_POSE_DOWN)
+        {
+          geometry_msgs::Twist visual_joy_twist;
+          visual_joy_twist.angular.x = 0.0;
+          visual_joy_twist.angular.y = 0.0;
+          visual_joy_twist.angular.z = 0.0;
+          visual_joy_twist.linear.x = 0.0;
+          visual_joy_twist.linear.y = 0.0;
+          visual_joy_twist.linear.z = -0.1;
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+        }
+        else if( left_hand_pose_ == constants::HAND_POSE_LEFT
+                 && right_hand_pose_ == constants::HAND_POSE_INSIDE)
+        {
+          geometry_msgs::Twist visual_joy_twist;
+          visual_joy_twist.angular.x = 0.0;
+          visual_joy_twist.angular.y = 0.0;
+          visual_joy_twist.angular.z = 0.0;
+          visual_joy_twist.linear.x = 0.0;
+          visual_joy_twist.linear.y = 0.1;
+          visual_joy_twist.linear.z = 0.0;
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+        }
+        else
+        {
+          geometry_msgs::Twist visual_joy_twist;
+          visual_joy_twist.angular.x = 0.0;
+          visual_joy_twist.angular.y = 0.0;
+          visual_joy_twist.angular.z = 0.0;
+          visual_joy_twist.linear.x = 0.0;
+          visual_joy_twist.linear.y = 0.0;
+          visual_joy_twist.linear.z = 0.0;
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+        }
+//        int lx = (h.faceROI.x_offset + h.faceROI.width/2) - (l.roi.x_offset + l.roi.width/2);
+//        int ly = (h.faceROI.y_offset + h.faceROI.height/2) - (l.roi.y_offset + l.roi.height/2);
+//        int rx = (r.roi.x_offset + r.roi.width/2) - (h.faceROI.x_offset + h.faceROI.width/2);
+//        int ry = (h.faceROI.y_offset + h.faceROI.height/2) - (r.roi.y_offset + r.roi.height/2);
+//        visual_joy_x_offset = (rx - lx)/2;
+//        visual_joy_y_offset = (ry - ly)/2;
+//        geometry_msgs::Twist visual_joy_twist;
+//        visual_joy_twist.angular.x = 0;
+//        visual_joy_twist.angular.y = 0;
+//        visual_joy_twist.angular.z = 0;
+//        visual_joy_twist.linear.x = 0;
+//        visual_joy_twist.linear.y = CLAMP(double(visual_joy_x_offset)/-10.0, -0.5, 0.5);
+//        visual_joy_twist.linear.z = CLAMP(double(visual_joy_y_offset)/-10.0, -0.5, 0.5);
+//        if( sub_bebop_alt_.IsActive()
+//            && sub_bebop_alt_()->altitude < 0.05
+//            && visual_joy_y_offset > 10)
+//          pub_bebop_take_off_.publish( msg_empty_);
+//        else if ( sub_bebop_alt_.IsActive()
+//                  && sub_bebop_alt_()->altitude < 1.0
+//                  && sub_bebop_alt_()->altitude > 0.3
+//                  && visual_joy_y_offset < -10)
+//          pub_bebop_land_.publish( msg_empty_);
+//        else
+//        {
+//          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+//          pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+//        }
       }
 
       ROS_ASSERT(sub_camera_info_()->width != 0);

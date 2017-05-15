@@ -70,6 +70,16 @@ enum gesture_states_t {
   GESTURE_NUM
 };
 
+enum hand_pose_t {
+  HAND_POSE_UNTRACKED = 0,
+  HAND_POSE_INSIDE,
+  HAND_POSE_LEFT,
+  HAND_POSE_RIGHT,
+  HAND_POSE_TOP,
+  HAND_POSE_DOWN,
+  HAND_POSE_NUM
+};
+
 const std::string STR_GESTURE_STATES_MAP[GESTURE_NUM + 1] = {"None", "Left", "Right", "Both", "NAN"};
 
 #define BEBOP_MODE_STR(x) (::bebop_hri::constants::STR_BEBOP_MODE_MAP[x])
@@ -220,6 +230,8 @@ protected:
   uint32_t gest_right_counter_;
   uint32_t gesture_both_counter_;
   bool GestureUpdate();
+  constants::hand_pose_t right_hand_pose_;
+  constants::hand_pose_t left_hand_pose_;
 
   // params
   double param_update_rate_;
