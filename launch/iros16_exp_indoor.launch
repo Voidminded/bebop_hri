@@ -1,9 +1,12 @@
 <?xml version="1.0"?>
 <launch>
+  <rosparam>
+     PictureSettingsVideoResolutionsType: 1
+  </rosparam>
   <include file="$(find bebop_hri)/launch/iros16.launch">
     <arg name="use_alvar" value="false" />
-    <arg name="use_obzerver" value="true" />
-    <arg name="use_cftld" value="true" />
+    <arg name="use_obzerver" value="false" />
+    <arg name="use_cftld" value="false" />
     <arg name="use_vicon" value="false" />
     <arg name="use_human" value="true" />
     <arg name="obz_logfile" value="/home/autolab/ros16/outdoor/obz" />

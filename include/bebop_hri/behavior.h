@@ -72,12 +72,17 @@ enum gesture_states_t {
 
 enum hand_pose_t {
   HAND_POSE_UNTRACKED = 0,
-  HAND_POSE_INSIDE,
-  HAND_POSE_LEFT,
-  HAND_POSE_RIGHT,
-  HAND_POSE_TOP,
-  HAND_POSE_DOWN,
+  HAND_POSE_INSIDE = 1,
+  HAND_POSE_LEFT = 2,
+  HAND_POSE_RIGHT = 3,
+  HAND_POSE_TOP = 4,
+  HAND_POSE_DOWN = 5,
   HAND_POSE_NUM
+};
+
+const std::string STR_HAND_POSE[HAND_POSE_NUM + 1] =
+{
+  "Untracked", "Inside", "Left", "Right", "Up", "Down", "NAN"
 };
 
 const std::string STR_GESTURE_STATES_MAP[GESTURE_NUM + 1] = {"None", "Left", "Right", "Both", "NAN"};
@@ -232,6 +237,10 @@ protected:
   bool GestureUpdate();
   constants::hand_pose_t right_hand_pose_;
   constants::hand_pose_t left_hand_pose_;
+  sensor_msgs::RegionOfInterest right_hand_ROI_;
+  sensor_msgs::RegionOfInterest left_hand_ROI_;
+  ros::Time camera_moved_time_;
+  int flip_counter_;
 
   // params
   double param_update_rate_;

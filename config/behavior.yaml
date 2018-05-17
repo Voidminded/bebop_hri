@@ -1,5 +1,5 @@
 update_freq: 30.0
-initial_mode: 0
+initial_mode: 7 #0
 joy_override_buttion: 7
 joy_override_timeout: 15.0
 joy_reset_buttion: 6

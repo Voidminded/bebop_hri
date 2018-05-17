@@ -17,7 +17,7 @@ bebop:
     bebop_ip: 192.168.42.1
     # temproarily set to bebop2 camera calib, should parameterize it though:
     camera_info_url: package://bebop_driver/data/bebop2_camera_calib.yaml
-    reset_settings: true
+    #reset_settings: true
     states: {enable_altitudechanged: true, enable_autotakeoffmodechanged: true, enable_camerastate_orientation: true,
       enable_commonstate_batterystatechanged: true, enable_commonstate_wifisignalchanged: true,
       enable_controllerstate_ispilotingchanged: true, enable_flightplanstate_availabilitystatechanged: true,

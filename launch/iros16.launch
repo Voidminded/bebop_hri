@@ -111,7 +111,7 @@
     </include>
     <group if="$(arg advanced_close_range)">
       <node pkg="nodelet" type="nodelet" name="nodelet_manager" args="manager" output="screen"/>
-      <node pkg="cftld_ros" type="cftld_ros_node" name="cftld_ros_right_hand_nodelet" output="screen" respawn="true">
+      <!--node pkg="cftld_ros" type="cftld_ros_node" name="cftld_ros_right_hand_nodelet" output="screen" respawn="true">
         <remap from="image_raw" to="bebop/image_raw" />
         <remap from="init_roi" to="gesture/right_hand/cftld/init_roi" />
         <remap from="reset" to="gesture/right_hand/cftld/reset" />
@@ -128,7 +128,7 @@
         <remap from="debug_image" to="gesture/left_hand/cftld/debug_image_raw" />
         <param name="tld_config_file" value="$(find cftld_ros)/config/cftld.cfg" />
         <rosparam command="load" file="$(find cftld_ros)/config/default.yaml" />
-      </node>
+      </node-->
       <node pkg="nodelet" type="nodelet" name="yolo2" args="load yolo2/Yolo2Nodelet nodelet_manager" output="screen" respawn="true">
         <param name="confidence" value="0.5" />
         <param name="nms" value="0.4" />

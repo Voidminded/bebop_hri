@@ -45,7 +45,7 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     pub_bebop_land_(nh_.advertise<std_msgs::Empty>("bebop/land", 10, false)),
     pub_bebop_snapshot_(nh_.advertise<std_msgs::Empty>("bebop/snapshot", 1, false)),
     pub_bebop_abs_vel_(nh_.advertise<geometry_msgs::Twist>("abs_vel_ctrl/setpoint/cmd_vel", 10, false)),
-    pub_visual_joy_cmd_vel_(nh_.advertise<geometry_msgs::Twist>("visual_joy/cmd_vel", 10, false)),
+    pub_visual_joy_cmd_vel_(nh_.advertise<geometry_msgs::Twist>("visual_joy/cmd_vel", 10, true)),
     status_publisher_(nh_, "status"),
     bebop_mode_(constants::MODE_NUM),
     bebop_mode_prev_(constants::MODE_NUM),
@@ -64,7 +64,9 @@ BebopBehaviorNode::BebopBehaviorNode(ros::NodeHandle& nh, ros::NodeHandle& priv_
     gesture_both_counter_(0.0),
     desired_search_inited_(false),
     right_hand_pose_(constants::HAND_POSE_UNTRACKED),
-    left_hand_pose_(constants::HAND_POSE_UNTRACKED)
+    left_hand_pose_(constants::HAND_POSE_UNTRACKED),
+    camera_moved_time_( ros::Time::now()),
+    flip_counter_(0)
 {
   UpdateParams();
   Transition(static_cast<constants::bebop_mode_t>(param_init_mode_));
@@ -176,12 +178,15 @@ void BebopBehaviorNode::MoveBebopCamera(const double &pan_deg, const double &til
 //    ROS_ERROR_ONCE("[BEH] Camera control is disabled");
 //    return;
 //  }
-
-  ROS_DEBUG_STREAM("[BEH] Request to move Bebop's camera to " << tilt_deg);
-  geometry_msgs::Twist twist;
-  twist.angular.y = tilt_deg;
-  twist.angular.z = pan_deg;
-  pub_bebop_camera_.publish(twist);
+  if( (ros::Time::now() - camera_moved_time_).toSec() > 0.5 )
+  {
+    ROS_DEBUG_STREAM("[BEH] Request to move Bebop's camera to " << tilt_deg);
+    geometry_msgs::Twist twist;
+    twist.angular.y = tilt_deg;
+    twist.angular.z = pan_deg;
+    pub_bebop_camera_.publish(twist);\
+    camera_moved_time_ = ros::Time::now();
+  }
 }
 
 bool BebopBehaviorNode::SetDesiredYaw()
@@ -199,8 +204,7 @@ bool BebopBehaviorNode::SetDesiredYaw()
 
 void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
 {
-  return;
-  ROS_WARN_STREAM("[BEH] Flip requested: " << flip_type);
+  ROS_WARN_STREAM("[BEH] Flip requested: " << (int)flip_type << " Counter : " << flip_counter_);
   std_msgs::UInt8 ft_msg;
   // TODO: bound check
   ft_msg.data = flip_type;
@@ -210,7 +214,7 @@ void BebopBehaviorNode::BebopFlip(const uint8_t flip_type)
 
 void BebopBehaviorNode::BebopSnapshot()
 {
-  ROS_WARN("[BEH] ing a snapshot ...");
+  ROS_WARN("[BEH] Taking a snapshot ...");
   std_msgs::Empty empty_msg;
   pub_bebop_snapshot_.publish(empty_msg);
 }
@@ -227,7 +231,7 @@ void BebopBehaviorNode::ControlBebopCamera()
 //    ROS_INFO_STREAM_THROTTLE(0.25, "[BEH] alt_target: " << alt_target
 //                             << " alt_bebop: " << sub_bebop_alt_()->altitude
 //                             << " tilt_rel: " << tilt);
-//    MoveBebopCamera(0.0, -CLAMP(tilt, 0.0, 1.0) * param_max_camera_tilt_deg_);
+//    MoveBebopCamera(0.0, CLAMP(tilt, 17, -83));
     MoveBebopCamera(0.0, tilt);
   }
 }
@@ -365,11 +369,6 @@ void BebopBehaviorNode::UpdateBehavior()
   ControlBebopCamera();
   switch (bebop_mode_)
   {
-  case constants::MODE_SEPEHR_HANDS:
-  {
-
-    break;
-  }
   case constants::MODE_IDLE:
   {
     ToggleAutonomyHuman(true);
@@ -792,6 +791,7 @@ void BebopBehaviorNode::UpdateBehavior()
     {
       ROS_INFO_STREAM("[BEH] Close range interaction ...");
       ToggleVisualServo(true);
+      ToggleYolo(true);
       ResetVisualTracker();
       ResetGestures();
     }
@@ -811,6 +811,8 @@ void BebopBehaviorNode::UpdateBehavior()
 
     if ((h.status != autonomy_human::human::STATUS_TRACKING))
     {
+      pub_cftld_left_hand_reset_.publish( msg_empty_);
+      pub_cftld_right_hand_reset_.publish( msg_empty_);
       ROS_WARN("[BEH] Tracker has lost the human");
       Transition(constants::MODE_CLOSERANGE_LOST);
     }
@@ -851,123 +853,167 @@ void BebopBehaviorNode::UpdateBehavior()
 //      if (param_enable_camera_control_)
       ControlBebopCamera();
 
-      bool leftLost = (!sub_left_hand_tracker_.IsActive()
-                       || ( sub_left_hand_tracker_.IsActive()
-                            && ( sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
-                                 || sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
-      bool rightLost = (!sub_right_hand_tracker_.IsActive()
-                        || ( sub_right_hand_tracker_.IsActive()
-                             && ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
-                                  || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
-      if( leftLost)
-        left_hand_pose_ = constants::HAND_POSE_UNTRACKED;
-      if( rightLost)
-        right_hand_pose_ = constants::HAND_POSE_UNTRACKED;
-      // Advanced gesture
-      if( (sub_left_hand_tracker_.IsActive()
-          && sub_left_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
-        || (sub_right_hand_tracker_.IsActive()
-          && sub_right_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
-          || !sub_left_hand_tracker_.IsActive()
-          || !sub_right_hand_tracker_.IsActive())
+//      bool leftLost = (!sub_left_hand_tracker_.IsActive()
+//                       || ( sub_left_hand_tracker_.IsActive()
+//                            && ( sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+//                                 || sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
+//      bool rightLost = (!sub_right_hand_tracker_.IsActive()
+//                        || ( sub_right_hand_tracker_.IsActive()
+//                             && ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+//                                  || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)));
+//      if( leftLost)
+//      {
+//        left_hand_pose_ = constants::HAND_POSE_UNTRACKED;
+//      }
+//      if( rightLost)
+//      {
+//        right_hand_pose_ = constants::HAND_POSE_UNTRACKED;
+//      }
+//      // Advanced gesture
+//      if( (sub_left_hand_tracker_.IsActive()
+//          && sub_left_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
+//        || (sub_right_hand_tracker_.IsActive()
+//          && sub_right_hand_tracker_()->status != cftld_ros::Track::STATUS_TRACKING)
+//          || !sub_left_hand_tracker_.IsActive()
+//          || !sub_right_hand_tracker_.IsActive())
+//      {
+//        ToggleYolo(true);
+//        if( sub_yolo_.IsActive()
+//            && sub_human_.IsActive())
+//        {
+//          yolo2::ImageDetections d = sub_yolo_.GetMsgCopy();
+//          autonomy_human::human h = sub_human_.GetMsgCopy();
+//          for( int i = 0; i < d.detections.size(); i++)
+//          {
+//            if( (!sub_left_hand_tracker_.IsActive()
+//                || ( sub_left_hand_tracker_.IsActive()
+//                     /*&& ( sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+//                          || sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)*/))
+//                && d.detections[i].roi.x_offset >= h.leftHROI.x_offset
+//                && d.detections[i].roi.x_offset < (h.leftHROI.x_offset + h.leftHROI.width)
+//                && d.detections[i].roi.y_offset >= h.leftHROI.y_offset
+//                && d.detections[i].roi.y_offset < (h.leftHROI.y_offset + h.leftHROI.height))
+//            {
+//              pub_cftld_left_hand_init_.publish( d.detections[i].roi);
+//            }
+//            if( (!sub_right_hand_tracker_.IsActive()
+//                || ( sub_right_hand_tracker_.IsActive()
+//                     /*&& ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
+//                          || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)*/))
+//                && d.detections[i].roi.x_offset >= h.rightHROI.x_offset
+//                && d.detections[i].roi.x_offset < (h.rightHROI.x_offset + h.rightHROI.width)
+//                && d.detections[i].roi.y_offset >= h.rightHROI.y_offset
+//                && d.detections[i].roi.y_offset < (h.rightHROI.y_offset + h.rightHROI.height))
+//            {
+//              pub_cftld_right_hand_init_.publish( d.detections[i].roi);
+//            }
+//          }
+//        }
+//      }
+//      else
+      bool left_valid = false;
+      bool right_valid = false;
+      if( sub_yolo_.IsActive()
+          && sub_human_.IsActive())
       {
-        ToggleYolo(true);
-        if( sub_yolo_.IsActive()
-            && sub_human_.IsActive())
+        yolo2::ImageDetections d = sub_yolo_.GetMsgCopy();
+        for( int i = 0; i < d.detections.size(); i++)
         {
-          yolo2::ImageDetections d = sub_yolo_.GetMsgCopy();
-          autonomy_human::human h = sub_human_.GetMsgCopy();
-          for( int i = 0; i < d.detections.size(); i++)
+          if( d.detections[i].class_id == 1)
+            continue;
+          if( d.detections[i].roi.x_offset > h.faceROI.x_offset)
           {
-            if( (!sub_left_hand_tracker_.IsActive()
-                || ( sub_left_hand_tracker_.IsActive()
-                     && ( sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
-                          || sub_left_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)))
-                && d.detections[i].roi.x_offset >= h.leftHROI.x_offset
-                && d.detections[i].roi.x_offset < (h.leftHROI.x_offset + h.leftHROI.width)
-                && d.detections[i].roi.y_offset >= h.leftHROI.y_offset
-                && d.detections[i].roi.y_offset < (h.leftHROI.y_offset + h.leftHROI.height))
-            {
-              pub_cftld_left_hand_init_.publish( d.detections[i].roi);
-            }
-            if( (!sub_right_hand_tracker_.IsActive()
-                || ( sub_right_hand_tracker_.IsActive()
-                     && ( sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_LOST
-                          || sub_right_hand_tracker_()->status == cftld_ros::Track::STATUS_UNKNOWN)))
-                && d.detections[i].roi.x_offset >= h.rightHROI.x_offset
-                && d.detections[i].roi.x_offset < (h.rightHROI.x_offset + h.rightHROI.width)
-                && d.detections[i].roi.y_offset >= h.rightHROI.y_offset
-                && d.detections[i].roi.y_offset < (h.rightHROI.y_offset + h.rightHROI.height))
-            {
-              pub_cftld_right_hand_init_.publish( d.detections[i].roi);
-            }
+            left_hand_ROI_ = d.detections[i].roi;
+            left_valid = true;
+          }
+          if( d.detections[i].roi.x_offset < h.faceROI.x_offset + h.faceROI.width)
+          {
+            right_hand_ROI_ = d.detections[i].roi;
+            right_valid = true;
           }
         }
-      }
-      else
-      {
-//        ToggleYolo(false);
-        cftld_ros::Track r = sub_right_hand_tracker_.GetMsgCopy();
-        cftld_ros::Track l = sub_left_hand_tracker_.GetMsgCopy();
+//        cftld_ros::Track r = sub_right_hand_tracker_.GetMsgCopy();
+//        cftld_ros::Track l = sub_left_hand_tracker_.GetMsgCopy();
+//        right_hand_ROI = r.roi;
+//        left_hand_ROI = l.roi;
         autonomy_human::human h = sub_human_.GetMsgCopy();
 
         // Right hand position finder
-        if( (r.roi.x_offset + r.roi.width/2) > (h.rightHROI.x_offset + h.rightHROI.width) )
+        ROS_INFO_STREAM_THROTTLE(6,"\nRH: " << right_hand_ROI_.x_offset << " " << right_hand_ROI_.y_offset << " " << right_hand_ROI_.width << " " << right_hand_ROI_.height <<
+                        " \nRR " << h.rightHROI.x_offset  << " " << h.rightHROI.y_offset << " " << h.rightHROI.width << " " << h.rightHROI.height <<
+                                 " \nFR " << h.faceROI.x_offset  << " " << h.faceROI.y_offset << " " << h.faceROI.width << " " << h.faceROI.height <<
+                        "\nLH: " << left_hand_ROI_.x_offset << " " << left_hand_ROI_.y_offset << " " << left_hand_ROI_.width << " " << left_hand_ROI_.height <<
+                        " \nLR " << h.leftHROI.x_offset  << " " << h.leftHROI.y_offset << " " << h.leftHROI.width << " " << h.leftHROI.height);
+        if( left_valid && right_valid)
         {
-          right_hand_pose_ = constants::HAND_POSE_RIGHT;
-          ROS_INFO("[GST] R -> R");
-        }
-        else if( (r.roi.x_offset + r.roi.width/2) < (h.rightHROI.x_offset) )
-        {
-          right_hand_pose_ = constants::HAND_POSE_LEFT;
-          ROS_INFO("[GST] R -> L");
-        }
-        else if( (r.roi.y_offset + r.roi.height/2) < (h.rightHROI.y_offset) )
-        {
-          right_hand_pose_ = constants::HAND_POSE_TOP;
-          ROS_INFO("[GST] R -> U");
-        }
-        else if( (r.roi.y_offset + r.roi.height/2) > (h.rightHROI.y_offset + h.rightHROI.height) )
-        {
-          right_hand_pose_ = constants::HAND_POSE_TOP;
-          ROS_INFO("[GST] R -> D");
+          if( (right_hand_ROI_.y_offset + right_hand_ROI_.height/2) < (h.rightHROI.y_offset) )
+          {
+            right_hand_pose_ = constants::HAND_POSE_TOP;
+            //          ROS_INFO("[GST] R -> U");
+          }
+          else if( (right_hand_ROI_.x_offset + right_hand_ROI_.width/2) > (h.rightHROI.x_offset + h.rightHROI.width) )
+          {
+            right_hand_pose_ = constants::HAND_POSE_LEFT;
+            //          ROS_INFO("[GST] R -> L");
+          }
+          else if( (right_hand_ROI_.x_offset + right_hand_ROI_.width/2) < (h.rightHROI.x_offset) )
+          {
+            right_hand_pose_ = constants::HAND_POSE_RIGHT;
+            //          ROS_INFO("[GST] R -> R");
+          }
+          else if( (right_hand_ROI_.y_offset + right_hand_ROI_.height/2) > (h.rightHROI.y_offset + h.rightHROI.height) )
+          {
+            right_hand_pose_ = constants::HAND_POSE_DOWN;
+            //          ROS_INFO("[GST] R -> D");
+          }
+          else
+            right_hand_pose_ = constants::HAND_POSE_INSIDE;
+
+          // Left hand position finder
+          if( (left_hand_ROI_.y_offset + left_hand_ROI_.height/2) < (h.leftHROI.y_offset) )
+          {
+            left_hand_pose_ = constants::HAND_POSE_TOP;
+            //          ROS_INFO("[GST] L -> U");
+          }
+          else if( (left_hand_ROI_.x_offset + left_hand_ROI_.width/2) > (h.leftHROI.x_offset + h.leftHROI.width) )
+          {
+            left_hand_pose_ = constants::HAND_POSE_LEFT;
+            //          ROS_INFO("[GST] L -> L");
+          }
+          else if( (left_hand_ROI_.x_offset + left_hand_ROI_.width/2) < (h.leftHROI.x_offset) )
+          {
+            left_hand_pose_ = constants::HAND_POSE_RIGHT;
+            //          ROS_INFO("[GST] L -> R");
+          }
+          else if( (left_hand_ROI_.y_offset + left_hand_ROI_.height/2) > (h.leftHROI.y_offset + h.leftHROI.height) )
+          {
+            left_hand_pose_ = constants::HAND_POSE_DOWN;
+            //          ROS_INFO("[GST] L -> D");
+          }
+          else
+            left_hand_pose_ = constants::HAND_POSE_INSIDE;
+          ROS_INFO_STREAM_THROTTLE(6,"[GST] Right-> " << constants::STR_HAND_POSE[right_hand_pose_] << " --- LEft-> " << constants::STR_HAND_POSE[left_hand_pose_]);
         }
         else
-          right_hand_pose_ = constants::HAND_POSE_INSIDE;
+        {
+          left_hand_pose_ = constants::HAND_POSE_UNTRACKED;
+          right_hand_pose_ = constants::HAND_POSE_UNTRACKED;
+        }
 
-        // Left hand position finder
-        if( (l.roi.x_offset + l.roi.width/2) > (h.leftHROI.x_offset + h.leftHROI.width) )
-        {
-          left_hand_pose_ = constants::HAND_POSE_RIGHT;
-          ROS_INFO("[GST] L -> R");
-        }
-        else if( (l.roi.x_offset + l.roi.width/2) < (h.leftHROI.x_offset) )
-        {
-          left_hand_pose_ = constants::HAND_POSE_LEFT;
-          ROS_INFO("[GST] L -> L");
-        }
-        else if( (l.roi.y_offset + l.roi.height/2) < (h.leftHROI.y_offset) )
-        {
-          left_hand_pose_ = constants::HAND_POSE_TOP;
-          ROS_INFO("[GST] L -> U");
-        }
-        else if( (l.roi.y_offset + l.roi.height/2) > (h.leftHROI.y_offset + h.leftHROI.height) )
-        {
-          left_hand_pose_ = constants::HAND_POSE_TOP;
-          ROS_INFO("[GST] L -> D");
-        }
-        else
-          left_hand_pose_ = constants::HAND_POSE_INSIDE;
-
+#if 1
+        // execute command based on gesture
+        bool flipping = false;
         if( left_hand_pose_ == constants::HAND_POSE_DOWN
             && right_hand_pose_ == constants::HAND_POSE_DOWN)
         {
           pub_bebop_land_.publish( msg_empty_);
+          ROS_INFO("Landing");
         }
         else if( left_hand_pose_ == constants::HAND_POSE_TOP
                  && right_hand_pose_ == constants::HAND_POSE_TOP)
         {
           pub_bebop_take_off_.publish( msg_empty_);
+          ROS_INFO("Taking off");
         }
         else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
                  && right_hand_pose_ == constants::HAND_POSE_RIGHT)
@@ -977,9 +1023,9 @@ void BebopBehaviorNode::UpdateBehavior()
           visual_joy_twist.angular.y = 0.0;
           visual_joy_twist.angular.z = 0.0;
           visual_joy_twist.linear.x = 0.0;
-          visual_joy_twist.linear.y = -0.1;
+          visual_joy_twist.linear.y = 0.2;
           visual_joy_twist.linear.z = 0.0;
-          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.y << " Vz: " << visual_joy_twist.linear.z);
           pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
         }
         else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
@@ -991,8 +1037,8 @@ void BebopBehaviorNode::UpdateBehavior()
           visual_joy_twist.angular.z = 0.0;
           visual_joy_twist.linear.x = 0.0;
           visual_joy_twist.linear.y = 0.0;
-          visual_joy_twist.linear.z = 0.1;
-          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          visual_joy_twist.linear.z = 0.2;
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.y << " Vz: " << visual_joy_twist.linear.z);
           pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
         }
         else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
@@ -1004,22 +1050,48 @@ void BebopBehaviorNode::UpdateBehavior()
           visual_joy_twist.angular.z = 0.0;
           visual_joy_twist.linear.x = 0.0;
           visual_joy_twist.linear.y = 0.0;
-          visual_joy_twist.linear.z = -0.1;
-          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          visual_joy_twist.linear.z = -0.2;
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.y << " Vz: " << visual_joy_twist.linear.z);
           pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
         }
         else if( left_hand_pose_ == constants::HAND_POSE_LEFT
                  && right_hand_pose_ == constants::HAND_POSE_INSIDE)
+//        else if( left_hand_pose_ == constants::HAND_POSE_INSIDE
+//                 && right_hand_pose_ == constants::HAND_POSE_LEFT)
         {
           geometry_msgs::Twist visual_joy_twist;
           visual_joy_twist.angular.x = 0.0;
           visual_joy_twist.angular.y = 0.0;
           visual_joy_twist.angular.z = 0.0;
           visual_joy_twist.linear.x = 0.0;
-          visual_joy_twist.linear.y = 0.1;
+          visual_joy_twist.linear.y = -0.2;
           visual_joy_twist.linear.z = 0.0;
-          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.y << " Vz: " << visual_joy_twist.linear.z);
           pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
+        }
+        else if( left_hand_pose_ == constants::HAND_POSE_DOWN
+                 && right_hand_pose_ == constants::HAND_POSE_TOP)
+        {
+          flipping = true;
+          if( flip_counter_ == 12)
+          {
+//            flip_counter_ = 0;
+            BebopFlip( 2);
+          }
+//          else
+          flip_counter_++;
+        }
+        else if( left_hand_pose_ == constants::HAND_POSE_TOP
+                 && right_hand_pose_ == constants::HAND_POSE_DOWN)
+        {
+          flipping = true;
+          if( flip_counter_ == 12)
+          {
+//            flip_counter_ = 0;
+            BebopFlip( 3);
+          }
+//          else
+          flip_counter_++;
         }
         else
         {
@@ -1030,9 +1102,13 @@ void BebopBehaviorNode::UpdateBehavior()
           visual_joy_twist.linear.x = 0.0;
           visual_joy_twist.linear.y = 0.0;
           visual_joy_twist.linear.z = 0.0;
-          ROS_INFO_STREAM_THROTTLE(0.25, "Vy : " << visual_joy_twist.linear.x << " Vz: " << visual_joy_twist.linear.z);
+          ROS_INFO_STREAM_THROTTLE(0.25, "STOP!!!!!!");
           pub_visual_joy_cmd_vel_.publish( visual_joy_twist);
         }
+
+        if( !flipping)
+            flip_counter_ = 0;
+#endif
 //        int lx = (h.faceROI.x_offset + h.faceROI.width/2) - (l.roi.x_offset + l.roi.width/2);
 //        int ly = (h.faceROI.y_offset + h.faceROI.height/2) - (l.roi.y_offset + l.roi.height/2);
 //        int rx = (r.roi.x_offset + r.roi.width/2) - (h.faceROI.x_offset + h.faceROI.width/2);
@@ -1066,19 +1142,19 @@ void BebopBehaviorNode::UpdateBehavior()
       const int view_angle_ = -180.0 * (((double(h.faceROI.width / 2.0)+ h.faceROI.x_offset)
                                          / sub_camera_info_()->width) - 0.5);
 
-      if(leftLost || rightLost)
-      {
-        gesture_feedback = true;
-        if(leftLost && rightLost)
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
-                                     "red", "red", 10, view_angle_);
-        if(!leftLost && rightLost)
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
-                                     "white", "red", 10, view_angle_);
-        if(leftLost && !rightLost)
-          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
-                                     "red", "white", 10, view_angle_);
-      }
+//      if(leftLost || rightLost)
+//      {
+//        gesture_feedback = true;
+//        if(leftLost && rightLost)
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+//                                     "red", "red", 10, view_angle_);
+//        if(!leftLost && rightLost)
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+//                                     "white", "red", 10, view_angle_);
+//        if(leftLost && !rightLost)
+//          led_feedback_.SendFeedback(autonomy_leds_msgs::Feedback::TYPE_EYE,
+//                                     "red", "white", 10, view_angle_);
+//      }
 //      // Gesture && Feedback
 //      flow_left_vec_.push_front(h.flowScore[0]);
 //      flow_right_vec_.push_front(h.flowScore[1]);
